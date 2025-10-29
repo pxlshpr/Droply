@@ -84,6 +84,58 @@ struct MarkerRow: View {
     }
 }
 
+struct HorizontalMarkerStrip: View {
+    let markers: [SongMarker]
+    let onTap: (SongMarker) -> Void
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(markers) { marker in
+                    MarkerPill(marker: marker)
+                        .onTapGesture {
+                            onTap(marker)
+                        }
+                }
+            }
+            .padding(.horizontal)
+        }
+    }
+}
+
+struct MarkerPill: View {
+    let marker: SongMarker
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(marker.emoji)
+                .font(.body)
+
+            Text(formatTime(marker.timestamp))
+                .font(.caption)
+                .fontWeight(.medium)
+                .monospacedDigit()
+                .foregroundStyle(.white)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            Capsule()
+                .fill(.white.opacity(0.2))
+        )
+        .overlay(
+            Capsule()
+                .stroke(.white.opacity(0.3), lineWidth: 1)
+        )
+    }
+
+    private func formatTime(_ time: TimeInterval) -> String {
+        let minutes = Int(time) / 60
+        let seconds = Int(time) % 60
+        return String(format: "%d:%02d", minutes, seconds)
+    }
+}
+
 #Preview {
     MarkerListView(
         markers: [
@@ -93,6 +145,20 @@ struct MarkerRow: View {
         ],
         onTap: { _ in },
         onDelete: { _ in }
+    )
+    .padding()
+    .background(Color.black)
+}
+
+#Preview("Horizontal Strip") {
+    HorizontalMarkerStrip(
+        markers: [
+            SongMarker(timestamp: 45, emoji: "🔥", name: "Drop"),
+            SongMarker(timestamp: 90, emoji: "🎸", name: "Solo"),
+            SongMarker(timestamp: 150, emoji: "💪", name: "Final push"),
+            SongMarker(timestamp: 200, emoji: "🎹", name: "Bridge")
+        ],
+        onTap: { _ in }
     )
     .padding()
     .background(Color.black)

@@ -21,36 +21,41 @@ struct NowPlayingView: View {
     @Query private var markedSongs: [MarkedSong]
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                // Dynamic background gradient from artwork colors
-                LinearGradient(
-                    colors: [backgroundColor1, backgroundColor2],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
-                .animation(.easeInOut(duration: 0.8), value: backgroundColor1)
-                .animation(.easeInOut(duration: 0.8), value: backgroundColor2)
+        ZStack {
+            // Dynamic background gradient from artwork colors
+            LinearGradient(
+                colors: [backgroundColor1, backgroundColor2],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+            .animation(.easeInOut(duration: 0.8), value: backgroundColor1)
+            .animation(.easeInOut(duration: 0.8), value: backgroundColor2)
 
-                VStack(spacing: 20) {
+            VStack(spacing: 0) {
                     if let song = musicService.currentSong {
+                        Spacer()
+
                         // Album artwork
                         albumArtwork(for: song)
+                            .padding(.bottom, 16)
 
                         // Song info
-                        VStack(spacing: 8) {
+                        VStack(spacing: 4) {
                             Text(song.title)
-                                .font(.title2)
+                                .font(.title3)
                                 .fontWeight(.bold)
                                 .multilineTextAlignment(.center)
                                 .foregroundStyle(.white)
+                                .lineLimit(1)
 
                             Text(song.artistName)
                                 .font(.subheadline)
                                 .foregroundStyle(.white.opacity(0.8))
+                                .lineLimit(1)
                         }
                         .padding(.horizontal)
+                        .padding(.bottom, 16)
 
                         // Marker timeline
                         MarkerTimelineView(
@@ -66,8 +71,9 @@ struct NowPlayingView: View {
                                 }
                             }
                         )
-                        .frame(height: 120)
+                        .frame(height: 100)
                         .padding(.horizontal)
+                        .padding(.bottom, 8)
 
                         // Time labels
                         HStack {
@@ -81,6 +87,7 @@ struct NowPlayingView: View {
                         }
                         .foregroundStyle(.white.opacity(0.7))
                         .padding(.horizontal, 30)
+                        .padding(.bottom, 16)
 
                         // Playback controls
                         HStack(spacing: 40) {
@@ -91,7 +98,7 @@ struct NowPlayingView: View {
                                 }
                             } label: {
                                 Image(systemName: "backward.fill")
-                                    .font(.system(size: 36))
+                                    .font(.system(size: 32))
                                     .foregroundStyle(.white)
                             }
 
@@ -102,7 +109,7 @@ struct NowPlayingView: View {
                                 }
                             } label: {
                                 Image(systemName: musicService.isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                                    .font(.system(size: 64))
+                                    .font(.system(size: 56))
                                     .foregroundStyle(.white)
                             }
 
@@ -113,44 +120,42 @@ struct NowPlayingView: View {
                                 }
                             } label: {
                                 Image(systemName: "forward.fill")
-                                    .font(.system(size: 36))
+                                    .font(.system(size: 32))
                                     .foregroundStyle(.white)
                             }
                         }
-                        .padding(.top, 20)
+                        .padding(.bottom, 12)
 
-                        // Add marker button
-                        Button {
-                            showingAddMarker = true
-                        } label: {
-                            HStack {
-                                Image(systemName: "bookmark.fill")
-                                Text("Add Marker")
-                            }
-                            .font(.callout)
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 12)
-                            .background(.white.opacity(0.2))
-                            .cornerRadius(20)
-                        }
-                        .disabled(musicService.currentSong == nil)
-
-                        // Markers list
+                        // Markers strip
                         if let markers = markedSong?.sortedMarkers, !markers.isEmpty {
-                            MarkerListView(
+                            HorizontalMarkerStrip(
                                 markers: markers,
                                 onTap: { marker in
                                     Task {
                                         await musicService.seekToMarker(marker)
                                         try? await musicService.play()
                                     }
-                                },
-                                onDelete: { marker in
-                                    deleteMarker(marker)
                                 }
                             )
+                            .padding(.bottom, 8)
                         }
+
+                        // Add marker button
+                        Button {
+                            showingAddMarker = true
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "bookmark.fill")
+                                Text("Add Marker")
+                            }
+                            .font(.subheadline)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(.white.opacity(0.2))
+                            .cornerRadius(20)
+                        }
+                        .disabled(musicService.currentSong == nil)
 
                         Spacer()
                     } else {
@@ -164,20 +169,6 @@ struct NowPlayingView: View {
                 }
                 .padding()
             }
-            .navigationTitle("Now Playing")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        musicService.logCurrentState()
-                    } label: {
-                        Image(systemName: "info.circle")
-                            .foregroundStyle(.white)
-                    }
-                }
-            }
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarBackground(backgroundColor1.opacity(0.7), for: .navigationBar)
             .sheet(isPresented: $showingAddMarker) {
                 if let song = musicService.currentSong {
                     AddMarkerView(
@@ -194,7 +185,6 @@ struct NowPlayingView: View {
                 updateMarkedSong(for: musicService.currentSong)
                 extractColorsFromArtwork(for: musicService.currentSong)
             }
-        }
     }
 
     // MARK: - Views
@@ -202,16 +192,16 @@ struct NowPlayingView: View {
     @ViewBuilder
     private func albumArtwork(for song: Song) -> some View {
         if let artwork = song.artwork {
-            ArtworkImage(artwork, width: 280, height: 280)
+            ArtworkImage(artwork, width: 240, height: 240)
                 .cornerRadius(12)
                 .shadow(radius: 10)
         } else {
             RoundedRectangle(cornerRadius: 12)
                 .fill(.ultraThinMaterial)
-                .frame(width: 280, height: 280)
+                .frame(width: 240, height: 240)
                 .overlay {
                     Image(systemName: "music.note")
-                        .font(.system(size: 80))
+                        .font(.system(size: 70))
                         .foregroundStyle(.secondary)
                 }
         }
