@@ -15,19 +15,23 @@ struct NowPlayingView: View {
     @State private var markedSong: MarkedSong?
     @State private var showingAddMarker = false
     @State private var selectedMarker: SongMarker?
+    @State private var backgroundColor1: Color = .purple.opacity(0.3)
+    @State private var backgroundColor2: Color = .blue.opacity(0.3)
 
     @Query private var markedSongs: [MarkedSong]
 
     var body: some View {
         NavigationStack {
             ZStack {
-                // Background gradient
+                // Dynamic background gradient from artwork colors
                 LinearGradient(
-                    colors: [.purple.opacity(0.3), .blue.opacity(0.3)],
+                    colors: [backgroundColor1, backgroundColor2],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
                 .ignoresSafeArea()
+                .animation(.easeInOut(duration: 0.8), value: backgroundColor1)
+                .animation(.easeInOut(duration: 0.8), value: backgroundColor2)
 
                 VStack(spacing: 20) {
                     if let song = musicService.currentSong {
@@ -40,10 +44,11 @@ struct NowPlayingView: View {
                                 .font(.title2)
                                 .fontWeight(.bold)
                                 .multilineTextAlignment(.center)
+                                .foregroundStyle(.white)
 
                             Text(song.artistName)
                                 .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(.white.opacity(0.8))
                         }
                         .padding(.horizontal)
 
@@ -78,7 +83,7 @@ struct NowPlayingView: View {
                                 .font(.caption)
                                 .monospacedDigit()
                         }
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.white.opacity(0.7))
                         .padding(.horizontal, 30)
 
                         // Playback controls
@@ -90,7 +95,7 @@ struct NowPlayingView: View {
                             } label: {
                                 Image(systemName: musicService.isPlaying ? "pause.circle.fill" : "play.circle.fill")
                                     .font(.system(size: 64))
-                                    .foregroundStyle(.primary)
+                                    .foregroundStyle(.white)
                             }
 
                             Button {
@@ -98,7 +103,7 @@ struct NowPlayingView: View {
                             } label: {
                                 Image(systemName: "bookmark.circle.fill")
                                     .font(.system(size: 48))
-                                    .foregroundStyle(.orange)
+                                    .foregroundStyle(.white)
                             }
                             .disabled(musicService.currentSong == nil)
                         }
@@ -140,9 +145,12 @@ struct NowPlayingView: View {
                         musicService.logCurrentState()
                     } label: {
                         Image(systemName: "info.circle")
+                            .foregroundStyle(.white)
                     }
                 }
             }
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarBackground(backgroundColor1.opacity(0.7), for: .navigationBar)
             .sheet(isPresented: $showingAddMarker) {
                 if let song = musicService.currentSong {
                     AddMarkerView(
@@ -153,9 +161,11 @@ struct NowPlayingView: View {
             }
             .onChange(of: musicService.currentSong) { _, newSong in
                 updateMarkedSong(for: newSong)
+                extractColorsFromArtwork(for: newSong)
             }
             .onAppear {
                 updateMarkedSong(for: musicService.currentSong)
+                extractColorsFromArtwork(for: musicService.currentSong)
             }
         }
     }
@@ -211,6 +221,40 @@ struct NowPlayingView: View {
     private func deleteMarker(_ marker: SongMarker) {
         modelContext.delete(marker)
         try? modelContext.save()
+    }
+
+    private func extractColorsFromArtwork(for song: Song?) {
+        guard let song = song,
+              let artwork = song.artwork,
+              let url = artwork.url(width: 300, height: 300) else {
+            // Reset to default colors if no artwork
+            withAnimation(.easeInOut(duration: 0.8)) {
+                backgroundColor1 = .purple.opacity(0.3)
+                backgroundColor2 = .blue.opacity(0.3)
+            }
+            return
+        }
+
+        Task {
+            do {
+                // Download the artwork image
+                let (data, _) = try await URLSession.shared.data(from: url)
+                guard let image = UIImage(data: data) else { return }
+
+                // Extract colors
+                if let colors = await ColorExtractor.extractColors(from: image) {
+                    await MainActor.run {
+                        withAnimation(.easeInOut(duration: 0.8)) {
+                            backgroundColor1 = Color(uiColor: colors.color1)
+                            backgroundColor2 = Color(uiColor: colors.color2)
+                        }
+                    }
+                }
+            } catch {
+                // If extraction fails, keep current colors
+                print("Failed to extract colors from artwork: \(error)")
+            }
+        }
     }
 }
 

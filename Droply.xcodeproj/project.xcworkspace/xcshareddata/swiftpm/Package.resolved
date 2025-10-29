@@ -1,6 +1,15 @@
 {
-  "originHash" : "1c78ec4c864394dd305bb035534c9f8aa226121d92b714af20bc936977fff195",
+  "originHash" : "d1e93a34548e52471d1bae1a13d00f9d068bc2ced07401705c8c98a43e1aeeca",
   "pins" : [
+    {
+      "identity" : "dominantcolors",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/DenDmitriev/DominantColors",
+      "state" : {
+        "revision" : "a05327d36092c47e9ddc77ce565eb35a5b4a4a6e",
+        "version" : "1.2.2"
+      }
+    },
     {
       "identity" : "ios-sdk",
       "kind" : "remoteSourceControl",

@@ -16,6 +16,7 @@ struct MarkerListView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Markers")
                 .font(.headline)
+                .foregroundStyle(.white)
                 .padding(.horizontal)
 
             ScrollView {
@@ -54,20 +55,21 @@ struct MarkerRow: View {
                     Text(name)
                         .font(.subheadline)
                         .fontWeight(.medium)
+                        .foregroundStyle(.white)
                 }
 
                 HStack(spacing: 8) {
                     Text(formatTime(marker.timestamp))
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.white.opacity(0.7))
                         .monospacedDigit()
 
                     if marker.bufferTime > 0 {
                         Text("•")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.white.opacity(0.7))
                         Text("\(Int(marker.bufferTime))s buffer")
                             .font(.caption)
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(.white.opacity(0.9))
                     }
                 }
             }
@@ -76,12 +78,12 @@ struct MarkerRow: View {
 
             Image(systemName: "chevron.right")
                 .font(.caption)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(.white.opacity(0.5))
         }
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(.ultraThinMaterial)
+                .fill(.white.opacity(0.15))
         )
     }
 

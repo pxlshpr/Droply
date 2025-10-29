@@ -24,18 +24,12 @@ struct MarkerTimelineView: View {
                 ZStack(alignment: .leading) {
                     // Background track
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(.ultraThinMaterial)
+                        .fill(.white.opacity(0.2))
                         .frame(height: 8)
 
                     // Progress bar
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(
-                            LinearGradient(
-                                colors: [.blue, .purple],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
+                        .fill(.white.opacity(0.6))
                         .frame(
                             width: progressWidth(geometry.size.width),
                             height: 8
@@ -78,7 +72,7 @@ struct MarkerTimelineView: View {
                 .font(.title3)
                 .background(
                     Circle()
-                        .fill(.ultraThinMaterial)
+                        .fill(.white.opacity(0.3))
                         .frame(width: 32, height: 32)
                 )
                 .onTapGesture {
@@ -86,14 +80,14 @@ struct MarkerTimelineView: View {
                 }
 
             Rectangle()
-                .fill(Color.orange)
+                .fill(.white)
                 .frame(width: 2, height: 20)
 
             if marker.bufferTime > 0 {
                 // Show buffer indicator
                 let bufferWidth = (marker.bufferTime / duration) * geometry.size.width
                 Rectangle()
-                    .fill(Color.orange.opacity(0.3))
+                    .fill(.white.opacity(0.3))
                     .frame(width: bufferWidth, height: 4)
                     .offset(x: -bufferWidth / 2)
             }

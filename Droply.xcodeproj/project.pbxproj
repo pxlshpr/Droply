@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		E2C4857E2EB268090034D2CE /* SpotifyiOS in Frameworks */ = {isa = PBXBuildFile; productRef = E2C4857D2EB268090034D2CE /* SpotifyiOS */; };
+		E2C4875D2EB28E680034D2CE /* DominantColors in Frameworks */ = {isa = PBXBuildFile; productRef = E2C4875C2EB28E680034D2CE /* DominantColors */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -69,6 +70,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E2C4875D2EB28E680034D2CE /* DominantColors in Frameworks */,
 				E2C4857E2EB268090034D2CE /* SpotifyiOS in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -131,6 +133,7 @@
 			name = Droply;
 			packageProductDependencies = (
 				E2C4857D2EB268090034D2CE /* SpotifyiOS */,
+				E2C4875C2EB28E680034D2CE /* DominantColors */,
 			);
 			productName = Droply;
 			productReference = E26040002EB265F20026C6C8 /* Droply.app */;
@@ -216,6 +219,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				E2C4857C2EB268090034D2CE /* XCRemoteSwiftPackageReference "ios-sdk" */,
+				E2C4875B2EB28E680034D2CE /* XCRemoteSwiftPackageReference "DominantColors" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E26040012EB265F20026C6C8 /* Products */;
@@ -614,6 +618,14 @@
 				kind = branch;
 			};
 		};
+		E2C4875B2EB28E680034D2CE /* XCRemoteSwiftPackageReference "DominantColors" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/DenDmitriev/DominantColors";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.2.2;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -621,6 +633,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = E2C4857C2EB268090034D2CE /* XCRemoteSwiftPackageReference "ios-sdk" */;
 			productName = SpotifyiOS;
+		};
+		E2C4875C2EB28E680034D2CE /* DominantColors */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E2C4875B2EB28E680034D2CE /* XCRemoteSwiftPackageReference "DominantColors" */;
+			productName = DominantColors;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
