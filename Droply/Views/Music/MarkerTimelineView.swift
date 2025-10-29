@@ -11,11 +11,10 @@ struct MarkerTimelineView: View {
     let currentTime: TimeInterval
     let duration: TimeInterval
     let markers: [SongMarker]
-    let onSeek: (TimeInterval) -> Void
+    let musicService: MusicKitService
     let onMarkerTap: (SongMarker) -> Void
 
-    @State private var isDragging = false
-    @State private var dragPosition: CGFloat = 0
+    @State private var localDragTime: TimeInterval?
 
     var body: some View {
         GeometryReader { geometry in
@@ -51,13 +50,22 @@ struct MarkerTimelineView: View {
                 .gesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { value in
-                            isDragging = true
-                            dragPosition = value.location.x
-                            let newTime = (value.location.x / geometry.size.width) * duration
-                            onSeek(max(0, min(newTime, duration)))
+                            if localDragTime == nil {
+                                // First drag event - notify service we're starting
+                                musicService.startDragging()
+                            }
+
+                            let newTime = max(0, min((value.location.x / geometry.size.width) * duration, duration))
+                            localDragTime = newTime
+                            musicService.updateDragPosition(to: newTime)
                         }
                         .onEnded { _ in
-                            isDragging = false
+                            if let finalTime = localDragTime {
+                                Task {
+                                    await musicService.endDragging(at: finalTime)
+                                }
+                            }
+                            localDragTime = nil
                         }
                 )
             }
@@ -97,7 +105,8 @@ struct MarkerTimelineView: View {
 
     private func progressWidth(_ totalWidth: CGFloat) -> CGFloat {
         guard duration > 0 else { return 0 }
-        return (currentTime / duration) * totalWidth
+        let timeToUse = localDragTime ?? currentTime
+        return (timeToUse / duration) * totalWidth
     }
 }
 
@@ -110,7 +119,7 @@ struct MarkerTimelineView: View {
             SongMarker(timestamp: 90, emoji: "🎸", name: "Solo", bufferTime: 3),
             SongMarker(timestamp: 150, emoji: "💪", name: "Final push", bufferTime: 10)
         ],
-        onSeek: { _ in },
+        musicService: MusicKitService.shared,
         onMarkerTap: { _ in }
     )
     .frame(height: 120)

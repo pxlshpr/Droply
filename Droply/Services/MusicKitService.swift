@@ -22,6 +22,7 @@ class MusicKitService: ObservableObject {
     @Published var isPlaying: Bool = false
     @Published var playbackTime: TimeInterval = 0
     @Published var playbackDuration: TimeInterval = 0
+    @Published var isDragging: Bool = false
 
     private let player = ApplicationMusicPlayer.shared
     private let systemPlayer = MPMusicPlayerController.systemMusicPlayer
@@ -218,8 +219,8 @@ class MusicKitService: ObservableObject {
     }
 
     private func updatePlaybackTime() {
-        // Don't update playback time while seeking to prevent race condition
-        guard !isSeeking else {
+        // Don't update playback time while seeking or dragging to prevent race condition
+        guard !isSeeking && !isDragging else {
             return
         }
 
@@ -328,6 +329,24 @@ class MusicKitService: ObservableObject {
     func seekToMarker(_ marker: SongMarker) async {
         let startTime = marker.playbackStartTime
         await seek(to: startTime)
+    }
+
+    // MARK: - Dragging State Management
+
+    func startDragging() {
+        logger.debug("Started dragging")
+        isDragging = true
+    }
+
+    func endDragging(at time: TimeInterval) async {
+        logger.debug("Ended dragging at time: \(time)")
+        isDragging = false
+        await seek(to: time)
+    }
+
+    func updateDragPosition(to time: TimeInterval) {
+        // Update the UI position without actually seeking
+        playbackTime = time
     }
 
     // MARK: - Queue Management

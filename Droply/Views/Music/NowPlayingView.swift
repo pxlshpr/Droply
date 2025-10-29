@@ -57,11 +57,7 @@ struct NowPlayingView: View {
                             currentTime: musicService.playbackTime,
                             duration: musicService.playbackDuration,
                             markers: markedSong?.sortedMarkers ?? [],
-                            onSeek: { time in
-                                Task {
-                                    await musicService.seek(to: time)
-                                }
-                            },
+                            musicService: musicService,
                             onMarkerTap: { marker in
                                 selectedMarker = marker
                                 Task {
