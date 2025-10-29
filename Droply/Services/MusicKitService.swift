@@ -260,6 +260,38 @@ class MusicKitService: ObservableObject {
         }
     }
 
+    func skipToNextItem() async throws {
+        logger.info("Skipping to next item")
+
+        // Determine which player is active
+        if systemPlayer.playbackState == .playing || systemPlayer.nowPlayingItem != nil {
+            // Use system player for next
+            logger.debug("Skipping next on system player")
+            systemPlayer.skipToNextItem()
+        } else {
+            // Use app player for next
+            logger.debug("Skipping next on app player")
+            try await player.skipToNextEntry()
+        }
+        logger.info("Skip to next completed")
+    }
+
+    func skipToPreviousItem() async throws {
+        logger.info("Skipping to previous item")
+
+        // Determine which player is active
+        if systemPlayer.playbackState == .playing || systemPlayer.nowPlayingItem != nil {
+            // Use system player for previous
+            logger.debug("Skipping previous on system player")
+            systemPlayer.skipToPreviousItem()
+        } else {
+            // Use app player for previous
+            logger.debug("Skipping previous on app player")
+            try await player.skipToPreviousEntry()
+        }
+        logger.info("Skip to previous completed")
+    }
+
     func seek(to time: TimeInterval) async {
         logger.info("Seeking to time: \(time)")
 

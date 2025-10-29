@@ -88,6 +88,18 @@ struct NowPlayingView: View {
 
                         // Playback controls
                         HStack(spacing: 40) {
+                            // Previous button
+                            Button {
+                                Task {
+                                    try? await musicService.skipToPreviousItem()
+                                }
+                            } label: {
+                                Image(systemName: "backward.fill")
+                                    .font(.system(size: 36))
+                                    .foregroundStyle(.white)
+                            }
+
+                            // Play/Pause button
                             Button {
                                 Task {
                                     try? await musicService.togglePlayPause()
@@ -98,16 +110,35 @@ struct NowPlayingView: View {
                                     .foregroundStyle(.white)
                             }
 
+                            // Next button
                             Button {
-                                showingAddMarker = true
+                                Task {
+                                    try? await musicService.skipToNextItem()
+                                }
                             } label: {
-                                Image(systemName: "bookmark.circle.fill")
-                                    .font(.system(size: 48))
+                                Image(systemName: "forward.fill")
+                                    .font(.system(size: 36))
                                     .foregroundStyle(.white)
                             }
-                            .disabled(musicService.currentSong == nil)
                         }
                         .padding(.top, 20)
+
+                        // Add marker button
+                        Button {
+                            showingAddMarker = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "bookmark.fill")
+                                Text("Add Marker")
+                            }
+                            .font(.callout)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 12)
+                            .background(.white.opacity(0.2))
+                            .cornerRadius(20)
+                        }
+                        .disabled(musicService.currentSong == nil)
 
                         // Markers list
                         if let markers = markedSong?.sortedMarkers, !markers.isEmpty {
