@@ -11,6 +11,7 @@ import SwiftData
 struct AddMarkerView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var musicService = MusicKitService.shared
 
     let currentTime: TimeInterval
     let markedSong: MarkedSong
@@ -68,27 +69,19 @@ struct AddMarkerView: View {
                         TextField("e.g., Drop, Solo, Final push", text: $markerName)
                     }
 
-                    // Spacer to make room for floating button
+                    // Spacer to make room for floating buttons
                     Section {
                         Color.clear
-                            .frame(height: 80)
+                            .frame(height: 120)
                     }
                 }
 
-                // Floating save button
-                VStack {
+                // Floating buttons
+                VStack(spacing: 12) {
                     Spacer()
 
-                    Button(action: saveMarker) {
-                        Text("Save Marker")
-                            .fontWeight(.semibold)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                    }
-                    .buttonStyle(.glassProminent)
-                    .disabled(selectedEmoji.isEmpty)
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 20)
+                    seekButtons
+                    saveButton
                 }
             }
             .navigationTitle("Add Marker")
@@ -102,6 +95,57 @@ struct AddMarkerView: View {
             }
         }
     }
+
+    // MARK: - Button Views
+
+    private var seekButtons: some View {
+        HStack(spacing: 12) {
+            seekButton(systemName: "gobackward.15", label: "15s", offset: -15)
+            seekButton(systemName: "gobackward.5", label: "5s", offset: -5)
+            seekButton(systemName: "goforward.5", label: "5s", offset: 5)
+            seekButton(systemName: "goforward.15", label: "15s", offset: 15)
+        }
+        .padding(.horizontal, 20)
+    }
+
+    private func seekButton(systemName: String, label: String, offset: TimeInterval) -> some View {
+        Button {
+            Task {
+                let newTime: TimeInterval
+                if offset < 0 {
+                    newTime = max(0, musicService.playbackTime + offset)
+                } else {
+                    newTime = min(musicService.playbackDuration, musicService.playbackTime + offset)
+                }
+                await musicService.seek(to: newTime)
+            }
+        } label: {
+            VStack(spacing: 4) {
+                Image(systemName: systemName)
+                    .font(.title2)
+                Text(label)
+                    .font(.caption2)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+        }
+        .buttonStyle(.glass)
+    }
+
+    private var saveButton: some View {
+        Button(action: saveMarker) {
+            Text("Save Marker")
+                .fontWeight(.semibold)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+        }
+        .buttonStyle(.glassProminent)
+        .disabled(selectedEmoji.isEmpty)
+        .padding(.horizontal, 20)
+        .padding(.bottom, 20)
+    }
+
+    // MARK: - Helper Methods
 
     private func formatTime(_ time: TimeInterval) -> String {
         let minutes = Int(time) / 60
