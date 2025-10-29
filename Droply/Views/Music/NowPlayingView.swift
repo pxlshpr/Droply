@@ -11,7 +11,7 @@ import MusicKit
 
 struct NowPlayingView: View {
     @Environment(\.modelContext) private var modelContext
-    @StateObject private var musicService = MusicKitService.shared
+    @ObservedObject private var musicService = MusicKitService.shared
     @State private var markedSong: MarkedSong?
     @State private var showingAddMarker = false
     @State private var selectedMarker: SongMarker?

@@ -10,7 +10,7 @@ import SwiftData
 import MusicKit
 
 struct ContentView: View {
-    @StateObject private var musicService = MusicKitService.shared
+    @ObservedObject private var musicService = MusicKitService.shared
     @State private var showingAuthorization = false
 
     var body: some View {
