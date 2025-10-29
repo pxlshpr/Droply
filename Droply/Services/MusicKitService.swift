@@ -17,7 +17,7 @@ class MusicKitService: ObservableObject {
 
     private let logger = Logger(subsystem: "com.droply.app", category: "MusicKit")
 
-    @Published var authorizationStatus: MusicAuthorization.Status = .notDetermined
+    @Published var authorizationStatus: MusicAuthorization.Status = MusicAuthorization.currentStatus
     @Published var currentSong: Song?
     @Published var isPlaying: Bool = false
     @Published var playbackTime: TimeInterval = 0
