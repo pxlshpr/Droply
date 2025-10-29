@@ -17,7 +17,6 @@ struct AddMarkerView: View {
 
     @State private var selectedEmoji = "🎵"
     @State private var markerName = ""
-    @State private var bufferTime: Double = 0
 
     private let commonEmojis = [
         "🎵", "🔥", "💪", "🎸", "🎹", "🥁",
@@ -27,79 +26,69 @@ struct AddMarkerView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Position")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                        Text(formatTime(currentTime))
-                            .font(.title2)
-                            .fontWeight(.semibold)
-                            .monospacedDigit()
-                    }
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 8)
-                }
-
-                Section("Emoji") {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 50))], spacing: 12) {
-                        ForEach(commonEmojis, id: \.self) { emoji in
-                            Text(emoji)
-                                .font(.largeTitle)
-                                .frame(width: 50, height: 50)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .fill(selectedEmoji == emoji ? Color.blue.opacity(0.2) : Color.clear)
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(selectedEmoji == emoji ? Color.blue : Color.clear, lineWidth: 2)
-                                )
-                                .onTapGesture {
-                                    selectedEmoji = emoji
-                                }
-                        }
-                    }
-                    .padding(.vertical, 8)
-                }
-
-                Section("Name (Optional)") {
-                    TextField("e.g., Drop, Solo, Final push", text: $markerName)
-                }
-
-                Section {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("Buffer Time")
-                            Spacer()
-                            Text("\(Int(bufferTime))s")
+            ZStack {
+                Form {
+                    Section {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Position")
+                                .font(.subheadline)
                                 .foregroundStyle(.secondary)
+                            Text(formatTime(currentTime))
+                                .font(.title2)
+                                .fontWeight(.semibold)
                                 .monospacedDigit()
                         }
-
-                        Slider(value: $bufferTime, in: 0...30, step: 1)
-
-                        Text("Start playback \(Int(bufferTime)) seconds before the marker")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 8)
                     }
-                } header: {
-                    Text("Buffer Time")
-                } footer: {
-                    Text("Perfect for setting up before a big moment - like getting in position for a lift or preparing for a difficult section")
+
+                    Section("Emoji") {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 50))], spacing: 12) {
+                            ForEach(commonEmojis, id: \.self) { emoji in
+                                Text(emoji)
+                                    .font(.largeTitle)
+                                    .frame(width: 50, height: 50)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .fill(selectedEmoji == emoji ? Color.blue.opacity(0.2) : Color.clear)
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(selectedEmoji == emoji ? Color.blue : Color.clear, lineWidth: 2)
+                                    )
+                                    .onTapGesture {
+                                        selectedEmoji = emoji
+                                    }
+                            }
+                        }
+                        .padding(.vertical, 8)
+                    }
+
+                    Section("Name (Optional)") {
+                        TextField("e.g., Drop, Solo, Final push", text: $markerName)
+                    }
+
+                    // Spacer to make room for floating button
+                    Section {
+                        Color.clear
+                            .frame(height: 80)
+                    }
                 }
 
-                Section {
+                // Floating save button
+                VStack {
+                    Spacer()
+
                     Button(action: saveMarker) {
-                        HStack {
-                            Spacer()
-                            Text("Save Marker")
-                                .fontWeight(.semibold)
-                            Spacer()
-                        }
+                        Text("Save Marker")
+                            .fontWeight(.semibold)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
                     }
+                    .buttonStyle(.glassProminent)
                     .disabled(selectedEmoji.isEmpty)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 20)
                 }
             }
             .navigationTitle("Add Marker")
@@ -124,8 +113,7 @@ struct AddMarkerView: View {
         let marker = SongMarker(
             timestamp: currentTime,
             emoji: selectedEmoji,
-            name: markerName.isEmpty ? nil : markerName,
-            bufferTime: bufferTime
+            name: markerName.isEmpty ? nil : markerName
         )
 
         marker.song = markedSong

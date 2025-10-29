@@ -58,20 +58,10 @@ struct MarkerRow: View {
                         .foregroundStyle(.white)
                 }
 
-                HStack(spacing: 8) {
-                    Text(formatTime(marker.timestamp))
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.7))
-                        .monospacedDigit()
-
-                    if marker.bufferTime > 0 {
-                        Text("•")
-                            .foregroundStyle(.white.opacity(0.7))
-                        Text("\(Int(marker.bufferTime))s buffer")
-                            .font(.caption)
-                            .foregroundStyle(.white.opacity(0.9))
-                    }
-                }
+                Text(formatTime(marker.timestamp))
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.7))
+                    .monospacedDigit()
             }
 
             Spacer()
@@ -97,9 +87,9 @@ struct MarkerRow: View {
 #Preview {
     MarkerListView(
         markers: [
-            SongMarker(timestamp: 45, emoji: "🔥", name: "Drop", bufferTime: 5),
-            SongMarker(timestamp: 90, emoji: "🎸", name: "Solo", bufferTime: 3),
-            SongMarker(timestamp: 150, emoji: "💪", name: "Final push", bufferTime: 10)
+            SongMarker(timestamp: 45, emoji: "🔥", name: "Drop"),
+            SongMarker(timestamp: 90, emoji: "🎸", name: "Solo"),
+            SongMarker(timestamp: 150, emoji: "💪", name: "Final push")
         ],
         onTap: { _ in },
         onDelete: { _ in }
