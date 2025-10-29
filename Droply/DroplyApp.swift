@@ -20,7 +20,7 @@ struct DroplyApp: App {
         let modelConfiguration = ModelConfiguration(
             schema: schema,
             isStoredInMemoryOnly: false,
-            cloudKitDatabase: .private("iCloud.com.ahmedrghb.droply")
+            cloudKitDatabase: .private("iCloud.com.ahmdrghb.droply")
         )
 
         do {

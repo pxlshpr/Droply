@@ -134,6 +134,15 @@ struct NowPlayingView: View {
             }
             .navigationTitle("Now Playing")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        musicService.logCurrentState()
+                    } label: {
+                        Image(systemName: "info.circle")
+                    }
+                }
+            }
             .sheet(isPresented: $showingAddMarker) {
                 if let song = musicService.currentSong {
                     AddMarkerView(
