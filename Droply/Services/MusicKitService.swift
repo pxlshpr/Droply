@@ -27,6 +27,8 @@ class MusicKitService: ObservableObject {
     private let systemPlayer = MPMusicPlayerController.systemMusicPlayer
     private var cancellables = Set<AnyCancellable>()
     private var playbackTimer: Timer?
+    private var isSeeking = false
+    private var seekDebounceTask: Task<Void, Never>?
 
     private init() {
         logger.info("MusicKitService initializing")
@@ -216,6 +218,11 @@ class MusicKitService: ObservableObject {
     }
 
     private func updatePlaybackTime() {
+        // Don't update playback time while seeking to prevent race condition
+        guard !isSeeking else {
+            return
+        }
+
         // Prefer system player if it's playing
         if systemPlayer.playbackState == .playing || systemPlayer.nowPlayingItem != nil {
             playbackTime = systemPlayer.currentPlaybackTime
@@ -255,8 +262,25 @@ class MusicKitService: ObservableObject {
 
     func seek(to time: TimeInterval) async {
         logger.info("Seeking to time: \(time)")
+
+        // Cancel any pending seek debounce
+        seekDebounceTask?.cancel()
+
+        // Set seeking flag to prevent timer from overwriting
+        isSeeking = true
+
+        // Set the playback time
         player.playbackTime = time
         playbackTime = time
+
+        // Debounce: clear the seeking flag after a delay to allow Apple Music to process
+        seekDebounceTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
+            if !Task.isCancelled {
+                self.isSeeking = false
+                logger.debug("Seek debounce completed, resuming playback time updates")
+            }
+        }
     }
 
     func seekToMarker(_ marker: SongMarker) async {
