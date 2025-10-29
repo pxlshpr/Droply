@@ -269,8 +269,18 @@ class MusicKitService: ObservableObject {
         // Set seeking flag to prevent timer from overwriting
         isSeeking = true
 
-        // Set the playback time
-        player.playbackTime = time
+        // Determine which player is active and seek on the correct one
+        if systemPlayer.playbackState == .playing || systemPlayer.nowPlayingItem != nil {
+            // Use system player for seeking
+            logger.debug("Seeking on system player")
+            systemPlayer.currentPlaybackTime = time
+        } else {
+            // Use app player for seeking
+            logger.debug("Seeking on app player")
+            player.playbackTime = time
+        }
+
+        // Update our published property
         playbackTime = time
 
         // Debounce: clear the seeking flag after a delay to allow Apple Music to process
