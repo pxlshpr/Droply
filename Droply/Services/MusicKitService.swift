@@ -325,17 +325,26 @@ class MusicKitService: ObservableObject {
     func skipToPreviousItem() async throws {
         logger.info("Skipping to previous item")
 
-        // Determine which player is active
-        if systemPlayer.playbackState == .playing || systemPlayer.nowPlayingItem != nil {
-            // Use system player for previous
-            logger.debug("Skipping previous on system player")
-            systemPlayer.skipToPreviousItem()
+        // Smart previous behavior: if we're past 3 seconds, restart the song
+        // Otherwise, go to the previous song (like Apple Music)
+        let threshold: TimeInterval = 3.0
+
+        if playbackTime > threshold {
+            logger.debug("Playback time (\(self.playbackTime)s) > threshold (\(threshold)s), restarting song")
+            await seek(to: 0)
         } else {
-            // Use app player for previous
-            logger.debug("Skipping previous on app player")
-            try await player.skipToPreviousEntry()
+            // Determine which player is active
+            if systemPlayer.playbackState == .playing || systemPlayer.nowPlayingItem != nil {
+                // Use system player for previous
+                logger.debug("Skipping previous on system player")
+                systemPlayer.skipToPreviousItem()
+            } else {
+                // Use app player for previous
+                logger.debug("Skipping previous on app player")
+                try await player.skipToPreviousEntry()
+            }
+            logger.info("Skip to previous completed")
         }
-        logger.info("Skip to previous completed")
     }
 
     func seek(to time: TimeInterval) async {

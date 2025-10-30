@@ -12,6 +12,7 @@ import MusicKit
 struct NowPlayingView: View {
     @Environment(\.modelContext) private var modelContext
     @ObservedObject private var musicService = MusicKitService.shared
+    @StateObject private var cueManager = CueVisualizationManager.shared
     @State private var markedSong: MarkedSong?
     @State private var showingAddMarker = false
     @State private var showingEditMarker = false
@@ -23,10 +24,15 @@ struct NowPlayingView: View {
     @State private var backgroundColor1: Color = .purple.opacity(0.3)
     @State private var backgroundColor2: Color = .blue.opacity(0.3)
     @AppStorage("defaultCueTime") private var defaultCueTime: Double = 5.0
+    @AppStorage("cueVisualizationMode") private var visualizationMode: String = CueVisualizationMode.button.rawValue
 
     @Query private var markedSongs: [MarkedSong]
 
     private let cueTimeOptions: [Double] = [0, 5, 10, 15, 30, 45, 60, 90, 120]
+
+    private var currentVisualizationMode: CueVisualizationMode {
+        CueVisualizationMode(rawValue: visualizationMode) ?? .button
+    }
  
     var body: some View {
         NavigationStack {
@@ -120,6 +126,18 @@ struct NowPlayingView: View {
                                     let startTime = max(0, marker.timestamp - defaultCueTime)
                                     await musicService.seek(to: startTime)
                                     try? await musicService.play()
+
+                                    // Start cue visualization
+                                    cueManager.startCue(
+                                        for: marker,
+                                        defaultCueTime: defaultCueTime,
+                                        currentTime: startTime
+                                    )
+
+                                    // Show fullscreen if that mode is selected
+                                    if currentVisualizationMode == .fullscreen {
+                                        cueManager.showFullscreenVisualization = true
+                                    }
                                 }
                             },
                             onMarkerEdit: { marker in
@@ -239,24 +257,66 @@ struct NowPlayingView: View {
                         Spacer()
 
                         // Markers strip
-                        HorizontalMarkerStrip(
-                            markers: markedSong?.sortedMarkers ?? [],
-                            onTap: { marker in
-                                Task {
-                                    let startTime = max(0, marker.timestamp - defaultCueTime)
-                                    await musicService.seek(to: startTime)
-                                    try? await musicService.play()
+                        if currentVisualizationMode == .marker {
+                            HorizontalMarkerStripWithAutoScroll(
+                                markers: markedSong?.sortedMarkers ?? [],
+                                activeMarker: cueManager.currentCue?.marker,
+                                progress: cueManager.cueProgress,
+                                onTap: { marker in
+                                    Task {
+                                        let startTime = max(0, marker.timestamp - defaultCueTime)
+                                        await musicService.seek(to: startTime)
+                                        try? await musicService.play()
+
+                                        // Start cue visualization
+                                        cueManager.startCue(
+                                            for: marker,
+                                            defaultCueTime: defaultCueTime,
+                                            currentTime: startTime
+                                        )
+                                    }
+                                },
+                                onMarkerEdit: { marker in
+                                    markerToEdit = marker
+                                    showingEditMarker = true
+                                },
+                                onMarkerDelete: { marker in
+                                    deleteMarker(marker)
                                 }
-                            },
-                            onMarkerEdit: { marker in
-                                markerToEdit = marker
-                                showingEditMarker = true
-                            },
-                            onMarkerDelete: { marker in
-                                deleteMarker(marker)
-                            }
-                        )
-                        .frame(maxWidth: availableWidth)
+                            )
+                            .frame(maxWidth: availableWidth)
+                        } else {
+                            HorizontalMarkerStrip(
+                                markers: markedSong?.sortedMarkers ?? [],
+                                onTap: { marker in
+                                    Task {
+                                        let startTime = max(0, marker.timestamp - defaultCueTime)
+                                        await musicService.seek(to: startTime)
+                                        try? await musicService.play()
+
+                                        // Start cue visualization
+                                        cueManager.startCue(
+                                            for: marker,
+                                            defaultCueTime: defaultCueTime,
+                                            currentTime: startTime
+                                        )
+
+                                        // Show fullscreen if that mode is selected
+                                        if currentVisualizationMode == .fullscreen {
+                                            cueManager.showFullscreenVisualization = true
+                                        }
+                                    }
+                                },
+                                onMarkerEdit: { marker in
+                                    markerToEdit = marker
+                                    showingEditMarker = true
+                                },
+                                onMarkerDelete: { marker in
+                                    deleteMarker(marker)
+                                }
+                            )
+                            .frame(maxWidth: availableWidth)
+                        }
                     }
                     .frame(maxWidth: availableWidth, alignment: .center)
                     .padding(.bottom, bottomSafeArea + 8)
@@ -281,6 +341,22 @@ struct NowPlayingView: View {
                         } label: {
                             Label("Recently Marked", systemImage: "clock.arrow.circlepath")
                         }
+
+                        Divider()
+
+                        Section("Cue Visualization") {
+                            ForEach(CueVisualizationMode.allCases) { mode in
+                                Button {
+                                    visualizationMode = mode.rawValue
+                                } label: {
+                                    Label(
+                                        mode.rawValue,
+                                        systemImage: mode.icon
+                                    )
+                                }
+                                .disabled(visualizationMode == mode.rawValue)
+                            }
+                        }
                     } label: {
                         Image(systemName: "ellipsis.circle")
                             .font(.title3)
@@ -289,17 +365,29 @@ struct NowPlayingView: View {
                 }
 
                 ToolbarItem(placement: .bottomBar) {
-                    Button {
-                        showingCueTimeSelector = true
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "timer")
-                            Text(formatCueTime(defaultCueTime))
-                                .font(.subheadline)
-                                .fontWeight(.medium)
+                    if currentVisualizationMode == .button {
+                        CueButtonVisualization(
+                            progress: cueManager.cueProgress,
+                            cueTime: defaultCueTime,
+                            isActive: cueManager.currentCue != nil,
+                            onTap: {
+                                showingCueTimeSelector = true
+                            }
+                        )
+                        .frame(maxWidth: .infinity)
+                    } else {
+                        Button {
+                            showingCueTimeSelector = true
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "timer")
+                                Text(formatCueTime(defaultCueTime))
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                            }
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             .toolbarBackground(.visible, for: .bottomBar)
@@ -344,6 +432,19 @@ struct NowPlayingView: View {
                 migrateLegacySongs()
                 updateMarkedSong(for: musicService.currentSong)
                 extractColorsFromArtwork(for: musicService.currentSong)
+                cueManager.setup(musicService: musicService)
+            }
+            .fullScreenCover(isPresented: $cueManager.showFullscreenVisualization) {
+                if let cue = cueManager.currentCue {
+                    FullscreenCueVisualization(
+                        marker: cue.marker,
+                        progress: cueManager.cueProgress,
+                        remainingTime: cue.endTime - musicService.playbackTime,
+                        onDismiss: {
+                            cueManager.showFullscreenVisualization = false
+                        }
+                    )
+                }
             }
         }
     }
