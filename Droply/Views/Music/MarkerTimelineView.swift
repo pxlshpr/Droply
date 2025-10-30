@@ -110,13 +110,13 @@ struct MarkerTimelineView: View {
                 .fill(.white)
                 .frame(width: 2, height: 12)
 
-            if marker.bufferTime > 0 {
-                // Show buffer indicator
-                let bufferWidth = (marker.bufferTime / duration) * geometry.size.width
+            if marker.cueTime > 0 {
+                // Show cue time indicator
+                let cueTimeWidth = (marker.cueTime / duration) * geometry.size.width
                 Rectangle()
                     .fill(.white.opacity(0.3))
-                    .frame(width: bufferWidth, height: 4)
-                    .offset(x: -bufferWidth / 2)
+                    .frame(width: cueTimeWidth, height: 4)
+                    .offset(x: -cueTimeWidth / 2)
             }
         }
         .offset(x: position - 16)
@@ -134,9 +134,9 @@ struct MarkerTimelineView: View {
         currentTime: 30,
         duration: 180,
         markers: [
-            SongMarker(timestamp: 45, emoji: "🔥", name: "Drop", bufferTime: 5),
-            SongMarker(timestamp: 90, emoji: "🎸", name: "Solo", bufferTime: 3),
-            SongMarker(timestamp: 150, emoji: "💪", name: "Final push", bufferTime: 10)
+            SongMarker(timestamp: 45, emoji: "🔥", name: "Drop", cueTime: 5),
+            SongMarker(timestamp: 90, emoji: "🎸", name: "Solo", cueTime: 3),
+            SongMarker(timestamp: 150, emoji: "💪", name: "Final push", cueTime: 10)
         ],
         musicService: MusicKitService.shared,
         onMarkerTap: { _ in },

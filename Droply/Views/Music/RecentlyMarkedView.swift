@@ -24,6 +24,34 @@ struct RecentlyMarkedView: View {
 
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @AppStorage("recentlyMarkedPlayMode") private var playMode: PlayMode = .cueAtFirstMarker
+
+    enum PlayMode: String {
+        case startOfSong = "Start of Song"
+        case cueAtFirstMarker = "Cue at First Marker"
+    }
+
+    // Group songs by time periods
+    private var groupedSongs: [(period: String, songs: [MarkedSong])] {
+        let now = Date()
+        var groups: [String: [MarkedSong]] = [:]
+
+        for song in recentlyMarkedSongs {
+            guard let lastMarkedAt = song.lastMarkedAt else { continue }
+            let period = timePeriod(for: lastMarkedAt, relativeTo: now)
+            groups[period, default: []].append(song)
+        }
+
+        let periodOrder = ["Last Hour", "Last Day", "Last Week", "Last Month",
+                          "2 Months Ago", "3 Months Ago", "4 Months Ago", "5 Months Ago",
+                          "6 Months Ago", "7 Months Ago", "8 Months Ago", "9 Months Ago",
+                          "10 Months Ago", "11 Months Ago", "Over a Year Ago"]
+
+        return periodOrder.compactMap { period in
+            guard let songs = groups[period], !songs.isEmpty else { return nil }
+            return (period: period, songs: songs)
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -35,25 +63,47 @@ struct RecentlyMarkedView: View {
                         description: Text("Songs you mark will appear here")
                     )
                 } else {
-                    List {
-                        ForEach(recentlyMarkedSongs) { song in
-                            RecentlyMarkedRow(song: song)
-                                .contentShape(Rectangle())
-                                .onTapGesture {
-                                    Task {
-                                        await playSong(song)
+                    VStack(spacing: 0) {
+                        List {
+                            ForEach(groupedSongs, id: \.period) { group in
+                                Section(header: Text(group.period)) {
+                                    ForEach(group.songs) { song in
+                                        RecentlyMarkedRow(song: song)
+                                            .contentShape(Rectangle())
+                                            .onTapGesture {
+                                                Task {
+                                                    await playSong(song)
+                                                }
+                                            }
                                     }
                                 }
+                            }
                         }
+
+                        // Segmented control for play mode
+                        VStack(spacing: 8) {
+                            Picker("Play Mode", selection: $playMode) {
+                                Text("Start").tag(PlayMode.startOfSong)
+                                Text("Cue at First Marker").tag(PlayMode.cueAtFirstMarker)
+                            }
+                            .pickerStyle(.segmented)
+                            .padding(.horizontal)
+                        }
+                        .padding(.vertical, 12)
+                        .background(.ultraThinMaterial)
                     }
                 }
             }
             .navigationTitle("Recently Marked")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
                         dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.body)
+                            .foregroundStyle(.primary)
                     }
                 }
             }
@@ -106,6 +156,20 @@ struct RecentlyMarkedView: View {
             // Play the song
             try await musicService.playSong(song)
 
+            // Handle play mode
+            switch playMode {
+            case .startOfSong:
+                // Already starts at beginning, just ensure it's playing
+                try? await musicService.play()
+            case .cueAtFirstMarker:
+                // Seek to first marker if available
+                if let firstMarker = markedSong.sortedMarkers.first {
+                    let startTime = max(0, firstMarker.timestamp - (firstMarker.cueTime))
+                    await musicService.seek(to: startTime)
+                }
+                try? await musicService.play()
+            }
+
             // Update last played at
             markedSong.lastPlayedAt = Date()
             try? modelContext.save()
@@ -117,6 +181,29 @@ struct RecentlyMarkedView: View {
         }
 
         isLoading = false
+    }
+
+    private func timePeriod(for date: Date, relativeTo now: Date) -> String {
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.hour, .day, .month], from: date, to: now)
+
+        if let hours = components.hour, hours < 1 {
+            return "Last Hour"
+        } else if let days = components.day, days < 1 {
+            return "Last Day"
+        } else if let days = components.day, days < 7 {
+            return "Last Week"
+        } else if let months = components.month {
+            if months < 1 {
+                return "Last Month"
+            } else if months < 12 {
+                return "\(months + 1) Months Ago"
+            } else {
+                return "Over a Year Ago"
+            }
+        }
+
+        return "Over a Year Ago"
     }
 }
 
@@ -157,45 +244,17 @@ struct RecentlyMarkedRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(song.title)
                     .font(.headline)
-                    .lineLimit(1)
+                    .lineLimit(nil)
 
                 Text(song.artist)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
-
-                if let lastMarkedAt = song.lastMarkedAt {
-                    Text(formatRelativeDate(lastMarkedAt))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                    .lineLimit(nil)
             }
 
             Spacer()
-
-            // Marker count badge
-            if let markerCount = song.markers?.count, markerCount > 0 {
-                Text("\(markerCount)")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.blue)
-                    .cornerRadius(12)
-            }
-
-            Image(systemName: "chevron.right")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
         }
         .padding(.vertical, 4)
-    }
-
-    private func formatRelativeDate(_ date: Date) -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .short
-        return formatter.localizedString(for: date, relativeTo: Date())
     }
 }
 

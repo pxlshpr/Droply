@@ -16,15 +16,16 @@ struct NowPlayingView: View {
     @State private var showingAddMarker = false
     @State private var showingEditMarker = false
     @State private var showingRecentlyMarked = false
+    @State private var recentlyMarkedDetent: PresentationDetent = .medium
     @State private var markerToEdit: SongMarker?
     @State private var selectedMarker: SongMarker?
     @State private var backgroundColor1: Color = .purple.opacity(0.3)
     @State private var backgroundColor2: Color = .blue.opacity(0.3)
-    @AppStorage("defaultBufferTime") private var defaultBufferTime: Double = 5.0
+    @AppStorage("defaultCueTime") private var defaultCueTime: Double = 5.0
 
     @Query private var markedSongs: [MarkedSong]
 
-    private let bufferOptions: [Double] = [0, 5, 10, 15, 30, 45, 60, 90, 120]
+    private let cueTimeOptions: [Double] = [0, 5, 10, 15, 30, 45, 60, 90, 120]
 
     var body: some View {
         NavigationStack {
@@ -55,8 +56,9 @@ struct NowPlayingView: View {
                     }
                     .padding(.horizontal)
                 } else if let song = musicService.currentSong {
-                    // Use full height since NavigationStack handles safe areas
-                    let availableHeight = geometry.size.height
+                    // Calculate available space accounting for safe areas
+                    let bottomSafeArea = max(geometry.safeAreaInsets.bottom, 20) // Minimum 20pt padding
+                    let availableHeight = geometry.size.height - bottomSafeArea
                     let availableWidth = geometry.size.width
 
                     // Calculate sizes - maximize artwork while fitting width
@@ -66,8 +68,20 @@ struct NowPlayingView: View {
 
                     let timelineHeight: CGFloat = 80
                     let timeFontSize: CGFloat = 40
-                    let controlButtonSize: CGFloat = 48
-                    let playButtonSize: CGFloat = 60
+
+                    // Calculate control button sizes based on available width
+                    // 5 buttons + 4 spacers + 48pt horizontal padding (24pt each side)
+                    let horizontalPadding: CGFloat = 48
+                    let spacing: CGFloat = 20
+                    let totalSpacing = spacing * 4 // 4 spacers between 5 buttons
+                    let availableForButtons = availableWidth - horizontalPadding - totalSpacing
+
+                    // Allocate button space: marker buttons get smaller portion, main buttons larger
+                    // Total "units": 2 marker (0.45 each) + 2 track (0.67 each) + 1 play (1.0) = 3.24 units
+                    let markerButtonUnit = availableForButtons / (2 * 0.45 + 2 * 0.67 + 1.0)
+
+                    let controlButtonSize: CGFloat = min(48, markerButtonUnit * 0.67)
+                    let playButtonSize: CGFloat = min(60, markerButtonUnit * 1.0)
 
                     VStack(spacing: 0) {
                         // Album artwork
@@ -102,7 +116,7 @@ struct NowPlayingView: View {
                             onMarkerTap: { marker in
                                 selectedMarker = marker
                                 Task {
-                                    let startTime = max(0, marker.timestamp - defaultBufferTime)
+                                    let startTime = max(0, marker.timestamp - defaultCueTime)
                                     await musicService.seek(to: startTime)
                                     try? await musicService.play()
                                 }
@@ -116,8 +130,8 @@ struct NowPlayingView: View {
                             }
                         )
                         .frame(height: timelineHeight)
-                        .padding(.horizontal)
-                        .padding(.bottom, 16)
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 8)
 
                         // Time labels
                         HStack(alignment: .lastTextBaseline, spacing: 6) {
@@ -136,12 +150,24 @@ struct NowPlayingView: View {
                                 .monospacedDigit()
                                 .foregroundStyle(.white.opacity(0.7))
                         }
-                        .padding(.horizontal)
-                        .padding(.bottom, 16)
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 24)
 
                         // Playback controls
-                        HStack(spacing: 30) {
-                            // Previous button
+                        HStack(spacing: 20) {
+                            // Previous marker button
+                            Button {
+                                navigateToPreviousMarker()
+                            } label: {
+                                Image(systemName: "chevron.backward.2")
+                                    .font(.system(size: controlButtonSize * 0.45))
+                                    .foregroundStyle(.white.opacity(0.8))
+                            }
+                            .buttonStyle(.plain)
+
+                            Spacer()
+
+                            // Previous track button
                             Button {
                                 Task {
                                     try? await musicService.skipToPreviousItem()
@@ -152,6 +178,8 @@ struct NowPlayingView: View {
                                     .foregroundStyle(.white)
                             }
                             .buttonStyle(.plain)
+
+                            Spacer()
 
                             // Play/Pause button
                             Button {
@@ -165,7 +193,9 @@ struct NowPlayingView: View {
                             }
                             .buttonStyle(.plain)
 
-                            // Next button
+                            Spacer()
+
+                            // Next track button
                             Button {
                                 Task {
                                     try? await musicService.skipToNextItem()
@@ -176,16 +206,28 @@ struct NowPlayingView: View {
                                     .foregroundStyle(.white)
                             }
                             .buttonStyle(.plain)
-                        }
-                        .padding(.horizontal)
-                        .padding(.bottom, 16)
 
-                        // Markers strip (extends to edges)
+                            Spacer()
+
+                            // Next marker button
+                            Button {
+                                navigateToNextMarker()
+                            } label: {
+                                Image(systemName: "chevron.forward.2")
+                                    .font(.system(size: controlButtonSize * 0.45))
+                                    .foregroundStyle(.white.opacity(0.8))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 24)
+
+                        // Markers strip
                         HorizontalMarkerStrip(
                             markers: markedSong?.sortedMarkers ?? [],
                             onTap: { marker in
                                 Task {
-                                    let startTime = max(0, marker.timestamp - defaultBufferTime)
+                                    let startTime = max(0, marker.timestamp - defaultCueTime)
                                     await musicService.seek(to: startTime)
                                     try? await musicService.play()
                                 }
@@ -202,20 +244,22 @@ struct NowPlayingView: View {
                             }
                         )
                         .padding(.bottom, 12)
+                        .frame(maxWidth: availableWidth)
 
-                        // Buffer selector (extends to edges)
+                        // Cue time selector
                         VStack(spacing: 6) {
-                            Text("Buffer Time")
+                            Text("Cue Time")
                                 .font(.caption)
                                 .foregroundStyle(.white.opacity(0.7))
                                 .padding(.horizontal)
 
-                            bufferSelector
+                            cueTimeSelector
+                                .frame(maxWidth: availableWidth)
                         }
-                        .padding(.bottom, 12)
-
-                        Spacer(minLength: 0)
+                        .padding(.bottom, 8)
                     }
+                    .frame(maxWidth: availableWidth, alignment: .center)
+                    .padding(.bottom, bottomSafeArea + 8)
                 } else {
                     // No song playing
                     ContentUnavailableView(
@@ -259,6 +303,9 @@ struct NowPlayingView: View {
             }
             .sheet(isPresented: $showingRecentlyMarked) {
                 RecentlyMarkedView()
+                    .presentationDetents([.medium, .large], selection: $recentlyMarkedDetent)
+                    .presentationBackgroundInteraction(.enabled(upThrough: .medium))
+                    .presentationBackground(.ultraThinMaterial)
             }
             .onChange(of: musicService.currentSong) { _, newSong in
                 updateMarkedSong(for: newSong)
@@ -292,32 +339,76 @@ struct NowPlayingView: View {
         }
     }
 
-    private var bufferSelector: some View {
+    private var cueTimeSelector: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                ForEach(bufferOptions, id: \.self) { buffer in
+                ForEach(cueTimeOptions, id: \.self) { cueTime in
                     Button {
-                        defaultBufferTime = buffer
+                        defaultCueTime = cueTime
                     } label: {
-                        Text(formatBufferTime(buffer))
+                        Text(formatCueTime(cueTime))
                             .font(.subheadline)
-                            .fontWeight(defaultBufferTime == buffer ? .bold : .medium)
-                            .foregroundStyle(defaultBufferTime == buffer ? .black : .white)
+                            .fontWeight(defaultCueTime == cueTime ? .bold : .medium)
+                            .foregroundStyle(defaultCueTime == cueTime ? .black : .white)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 8)
-                            .background(defaultBufferTime == buffer ? .white : .white.opacity(0.2))
+                            .background(defaultCueTime == cueTime ? .white : .white.opacity(0.2))
                             .cornerRadius(16)
-                            .scaleEffect(defaultBufferTime == buffer ? 1.05 : 1.0)
-                            .shadow(color: defaultBufferTime == buffer ? .white.opacity(0.3) : .clear, radius: 8)
+                            .scaleEffect(defaultCueTime == cueTime ? 1.05 : 1.0)
+                            .shadow(color: defaultCueTime == cueTime ? .white.opacity(0.3) : .clear, radius: 8)
                     }
-                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: defaultBufferTime)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: defaultCueTime)
                 }
             }
-            .padding(.horizontal)
+            .padding(.horizontal, 24)
         }
     }
 
     // MARK: - Helper Methods
+
+    private func findPreviousMarker() -> SongMarker? {
+        guard let markers = markedSong?.sortedMarkers else { return nil }
+        let currentTime = musicService.playbackTime
+
+        // Find the last marker that is before the current time
+        return markers.last { $0.timestamp < currentTime }
+    }
+
+    private func findNextMarker() -> SongMarker? {
+        guard let markers = markedSong?.sortedMarkers else { return nil }
+        let currentTime = musicService.playbackTime
+
+        // Find the first marker that is after the current time
+        return markers.first { $0.timestamp > currentTime }
+    }
+
+    private func navigateToPreviousMarker() {
+        if let marker = findPreviousMarker() {
+            Task {
+                let startTime = max(0, marker.timestamp - defaultCueTime)
+                await musicService.seek(to: startTime)
+                try? await musicService.play()
+            }
+        } else {
+            // No previous marker found - error haptic
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.error)
+        }
+    }
+
+    private func navigateToNextMarker() {
+        if let marker = findNextMarker() {
+            Task {
+                let startTime = max(0, marker.timestamp - defaultCueTime)
+                await musicService.seek(to: startTime)
+                try? await musicService.play()
+            }
+        } else {
+            // No next marker found - error haptic
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.error)
+        }
+    }
 
     private func formatTime(_ time: TimeInterval) -> String {
         let minutes = Int(time) / 60
@@ -325,7 +416,7 @@ struct NowPlayingView: View {
         return String(format: "%d:%02d", minutes, seconds)
     }
 
-    private func formatBufferTime(_ seconds: Double) -> String {
+    private func formatCueTime(_ seconds: Double) -> String {
         if seconds == 0 {
             return "0s"
         } else if seconds < 60 {

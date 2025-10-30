@@ -138,7 +138,7 @@ struct HorizontalMarkerStrip: View {
                     }
                 }
             }
-            .padding(.horizontal)
+            .padding(.horizontal, 24)
         }
     }
 }

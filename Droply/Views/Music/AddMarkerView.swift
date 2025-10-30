@@ -12,7 +12,7 @@ struct AddMarkerView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var musicService = MusicKitService.shared
-    @AppStorage("defaultBufferTime") private var defaultBufferTime: Double = 5.0
+    @AppStorage("defaultCueTime") private var defaultCueTime: Double = 5.0
 
     let currentTime: TimeInterval
     let markedSong: MarkedSong
@@ -159,7 +159,7 @@ struct AddMarkerView: View {
             timestamp: currentTime,
             emoji: selectedEmoji,
             name: markerName.isEmpty ? nil : markerName,
-            bufferTime: defaultBufferTime
+            cueTime: defaultCueTime
         )
 
         marker.song = markedSong
