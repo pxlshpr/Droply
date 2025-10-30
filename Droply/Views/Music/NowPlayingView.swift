@@ -17,8 +17,11 @@ struct NowPlayingView: View {
     @State private var selectedMarker: SongMarker?
     @State private var backgroundColor1: Color = .purple.opacity(0.3)
     @State private var backgroundColor2: Color = .blue.opacity(0.3)
+    @AppStorage("defaultBufferTime") private var defaultBufferTime: Double = 5.0
 
     @Query private var markedSongs: [MarkedSong]
+
+    private let bufferOptions: [Double] = [0, 5, 10, 15, 30, 45, 60, 90, 120]
 
     var body: some View {
         ZStack {
@@ -66,7 +69,8 @@ struct NowPlayingView: View {
                             onMarkerTap: { marker in
                                 selectedMarker = marker
                                 Task {
-                                    await musicService.seekToMarker(marker)
+                                    let startTime = max(0, marker.timestamp - defaultBufferTime)
+                                    await musicService.seek(to: startTime)
                                     try? await musicService.play()
                                 }
                             }
@@ -101,6 +105,7 @@ struct NowPlayingView: View {
                                     .font(.system(size: 32))
                                     .foregroundStyle(.white)
                             }
+                            .buttonStyle(.plain)
 
                             // Play/Pause button
                             Button {
@@ -112,6 +117,7 @@ struct NowPlayingView: View {
                                     .font(.system(size: 56))
                                     .foregroundStyle(.white)
                             }
+                            .buttonStyle(.plain)
 
                             // Next button
                             Button {
@@ -123,6 +129,7 @@ struct NowPlayingView: View {
                                     .font(.system(size: 32))
                                     .foregroundStyle(.white)
                             }
+                            .buttonStyle(.plain)
                         }
                         .padding(.bottom, 12)
 
@@ -132,13 +139,24 @@ struct NowPlayingView: View {
                                 markers: markers,
                                 onTap: { marker in
                                     Task {
-                                        await musicService.seekToMarker(marker)
+                                        let startTime = max(0, marker.timestamp - defaultBufferTime)
+                                        await musicService.seek(to: startTime)
                                         try? await musicService.play()
                                     }
                                 }
                             )
                             .padding(.bottom, 8)
                         }
+
+                        // Buffer selector
+                        VStack(spacing: 8) {
+                            Text("Buffer Time")
+                                .font(.caption)
+                                .foregroundStyle(.white.opacity(0.7))
+
+                            bufferSelector
+                        }
+                        .padding(.bottom, 12)
 
                         // Add marker button
                         Button {
@@ -207,12 +225,48 @@ struct NowPlayingView: View {
         }
     }
 
+    private var bufferSelector: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(bufferOptions, id: \.self) { buffer in
+                    Button {
+                        defaultBufferTime = buffer
+                    } label: {
+                        Text(formatBufferTime(buffer))
+                            .font(.subheadline)
+                            .fontWeight(defaultBufferTime == buffer ? .bold : .medium)
+                            .foregroundStyle(defaultBufferTime == buffer ? .black : .white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(defaultBufferTime == buffer ? .white : .white.opacity(0.2))
+                            .cornerRadius(16)
+                            .scaleEffect(defaultBufferTime == buffer ? 1.05 : 1.0)
+                            .shadow(color: defaultBufferTime == buffer ? .white.opacity(0.3) : .clear, radius: 8)
+                    }
+                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: defaultBufferTime)
+                }
+            }
+            .padding(.horizontal)
+        }
+    }
+
     // MARK: - Helper Methods
 
     private func formatTime(_ time: TimeInterval) -> String {
         let minutes = Int(time) / 60
         let seconds = Int(time) % 60
         return String(format: "%d:%02d", minutes, seconds)
+    }
+
+    private func formatBufferTime(_ seconds: Double) -> String {
+        if seconds == 0 {
+            return "0s"
+        } else if seconds < 60 {
+            return "\(Int(seconds))s"
+        } else {
+            let minutes = Int(seconds / 60)
+            return "\(minutes)m"
+        }
     }
 
     private func updateMarkedSong(for song: Song?) {
