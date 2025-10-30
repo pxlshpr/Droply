@@ -13,6 +13,8 @@ struct MarkerTimelineView: View {
     let markers: [SongMarker]
     let musicService: MusicKitService
     let onMarkerTap: (SongMarker) -> Void
+    let onMarkerEdit: ((SongMarker) -> Void)?
+    let onMarkerDelete: ((SongMarker) -> Void)?
 
     @State private var localDragTime: TimeInterval?
 
@@ -86,6 +88,23 @@ struct MarkerTimelineView: View {
                 .onTapGesture {
                     onMarkerTap(marker)
                 }
+                .contextMenu {
+                    if let onEdit = onMarkerEdit {
+                        Button {
+                            onEdit(marker)
+                        } label: {
+                            Label("Edit", systemImage: "pencil")
+                        }
+                    }
+
+                    if let onDelete = onMarkerDelete {
+                        Button(role: .destructive) {
+                            onDelete(marker)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
+                }
 
             Rectangle()
                 .fill(.white)
@@ -120,7 +139,9 @@ struct MarkerTimelineView: View {
             SongMarker(timestamp: 150, emoji: "💪", name: "Final push", bufferTime: 10)
         ],
         musicService: MusicKitService.shared,
-        onMarkerTap: { _ in }
+        onMarkerTap: { _ in },
+        onMarkerEdit: { _ in },
+        onMarkerDelete: { _ in }
     )
     .frame(height: 120)
     .padding()
