@@ -312,6 +312,7 @@ struct NowPlayingView: View {
                 extractColorsFromArtwork(for: newSong)
             }
             .onAppear {
+                migrateLegacySongs()
                 updateMarkedSong(for: musicService.currentSong)
                 extractColorsFromArtwork(for: musicService.currentSong)
             }
@@ -448,7 +449,37 @@ struct NowPlayingView: View {
     }
 
     private func deleteMarker(_ marker: SongMarker) {
+        // Keep reference to song before deleting the marker
+        let song = marker.song
+
         modelContext.delete(marker)
+
+        // If the song has no more markers, delete it
+        if let song = song,
+           (song.markers?.isEmpty ?? true) || song.sortedMarkers.isEmpty {
+            modelContext.delete(song)
+        }
+
+        try? modelContext.save()
+    }
+
+    private func migrateLegacySongs() {
+        // Find all songs that have markers but no lastMarkedAt timestamp
+        let legacySongs = markedSongs.filter { song in
+            guard let markers = song.markers, !markers.isEmpty else {
+                return false
+            }
+            return song.lastMarkedAt == nil
+        }
+
+        // Update lastMarkedAt for legacy songs
+        guard !legacySongs.isEmpty else { return }
+
+        let now = Date()
+        for song in legacySongs {
+            song.lastMarkedAt = now
+        }
+
         try? modelContext.save()
     }
 
@@ -487,7 +518,332 @@ struct NowPlayingView: View {
     }
 }
 
-#Preview {
-    NowPlayingView()
-        .modelContainer(for: [MarkedSong.self, SongMarker.self], inMemory: true)
+// MARK: - Preview Helpers
+
+@MainActor
+private func createPreviewContainer() -> ModelContainer {
+    let schema = Schema([MarkedSong.self, SongMarker.self])
+    let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+
+    do {
+        let container = try ModelContainer(for: schema, configurations: [modelConfiguration])
+        let context = container.mainContext
+
+        // Create a mock marked song
+        let markedSong = MarkedSong(
+            appleMusicID: "preview-song-id",
+            title: "Bohemian Rhapsody",
+            artist: "Queen",
+            albumTitle: "A Night at the Opera",
+            duration: 354.0 // 5:54
+        )
+        context.insert(markedSong)
+
+        // Create some dummy markers
+        let marker1 = SongMarker(
+            timestamp: 45.0,
+            emoji: "🎸",
+            name: "Guitar Solo",
+            cueTime: 5.0
+        )
+        marker1.song = markedSong
+        context.insert(marker1)
+
+        let marker2 = SongMarker(
+            timestamp: 120.0,
+            emoji: "🎤",
+            name: "Opera Section",
+            cueTime: 10.0
+        )
+        marker2.song = markedSong
+        context.insert(marker2)
+
+        let marker3 = SongMarker(
+            timestamp: 210.0,
+            emoji: "🔥",
+            name: "Hard Rock",
+            cueTime: 5.0
+        )
+        marker3.song = markedSong
+        context.insert(marker3)
+
+        let marker4 = SongMarker(
+            timestamp: 280.0,
+            emoji: "🎹",
+            name: "Ballad Ending",
+            cueTime: 15.0
+        )
+        marker4.song = markedSong
+        context.insert(marker4)
+
+        try context.save()
+        return container
+    } catch {
+        fatalError("Failed to create preview container: \(error)")
+    }
+}
+
+struct NowPlayingViewPreview: View {
+    let container: ModelContainer
+    @State private var currentTime: TimeInterval = 75.0
+    @State private var duration: TimeInterval = 354.0
+    @State private var isPlaying: Bool = true
+    @State private var backgroundColor1: Color = .purple.opacity(0.3)
+    @State private var backgroundColor2: Color = .blue.opacity(0.3)
+    @AppStorage("defaultCueTime") private var defaultCueTime: Double = 5.0
+
+    @Query private var markedSongs: [MarkedSong]
+
+    private let cueTimeOptions: [Double] = [0, 5, 10, 15, 30, 45, 60, 90, 120]
+
+    var markedSong: MarkedSong? {
+        markedSongs.first
+    }
+
+    var body: some View {
+        NavigationStack {
+            GeometryReader { geometry in
+                ZStack {
+                    LinearGradient(
+                        colors: [backgroundColor1, backgroundColor2],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .ignoresSafeArea()
+
+                    VStack(spacing: 0) {
+                        let bottomSafeArea = max(geometry.safeAreaInsets.bottom, 20)
+                        let availableHeight = geometry.size.height - bottomSafeArea
+                        let availableWidth = geometry.size.width
+
+                        let maxArtworkFromWidth = availableWidth - 32
+                        let maxArtworkFromHeight = availableHeight * 0.45
+                        let artworkSize = min(maxArtworkFromWidth, maxArtworkFromHeight)
+
+                        let timelineHeight: CGFloat = 80
+                        let timeFontSize: CGFloat = 40
+
+                        let horizontalPadding: CGFloat = 48
+                        let spacing: CGFloat = 20
+                        let totalSpacing = spacing * 4
+                        let availableForButtons = availableWidth - horizontalPadding - totalSpacing
+                        let markerButtonUnit = availableForButtons / (2 * 0.45 + 2 * 0.67 + 1.0)
+                        let controlButtonSize: CGFloat = min(48, markerButtonUnit * 0.67)
+                        let playButtonSize: CGFloat = min(60, markerButtonUnit * 1.0)
+
+                        VStack(spacing: 0) {
+                            // Album artwork (black square)
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.black)
+                                .frame(width: artworkSize, height: artworkSize)
+                                .shadow(radius: 10)
+                                .padding(.horizontal, 16)
+                                .padding(.bottom, 16)
+
+                            // Song info
+                            VStack(spacing: 2) {
+                                Text("Bohemian Rhapsody")
+                                    .font(.title3)
+                                    .fontWeight(.bold)
+                                    .multilineTextAlignment(.center)
+                                    .foregroundStyle(.white)
+                                    .lineLimit(1)
+
+                                Text("Queen")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.white.opacity(0.8))
+                                    .lineLimit(1)
+                            }
+                            .padding(.horizontal)
+                            .padding(.bottom, 16)
+
+                            // Marker timeline
+                            if let markedSong {
+                                MarkerTimelineView(
+                                    currentTime: currentTime,
+                                    duration: duration,
+                                    markers: markedSong.sortedMarkers,
+                                    musicService: MusicKitService.shared,
+                                    onMarkerTap: { _ in },
+                                    onMarkerEdit: { _ in },
+                                    onMarkerDelete: { _ in }
+                                )
+                                .frame(height: timelineHeight)
+                                .padding(.horizontal, 24)
+                                .padding(.bottom, 8)
+                            }
+
+                            // Time labels
+                            HStack(alignment: .lastTextBaseline, spacing: 6) {
+                                Text(formatTime(currentTime))
+                                    .font(.system(size: timeFontSize, weight: .bold, design: .rounded))
+                                    .monospacedDigit()
+                                    .foregroundStyle(.white)
+
+                                Text("/")
+                                    .font(.system(size: timeFontSize * 0.5, weight: .medium, design: .rounded))
+                                    .foregroundStyle(.white.opacity(0.5))
+
+                                Text(formatTime(duration))
+                                    .font(.system(size: timeFontSize * 0.5, weight: .medium, design: .rounded))
+                                    .monospacedDigit()
+                                    .foregroundStyle(.white.opacity(0.7))
+                            }
+                            .padding(.horizontal, 24)
+                            .padding(.bottom, 24)
+
+                            // Playback controls
+                            HStack(spacing: 20) {
+                                Button { } label: {
+                                    Image(systemName: "chevron.backward.2")
+                                        .font(.system(size: controlButtonSize * 0.45))
+                                        .foregroundStyle(.white.opacity(0.8))
+                                }
+
+                                Spacer()
+
+                                Button { } label: {
+                                    Image(systemName: "backward.fill")
+                                        .font(.system(size: controlButtonSize * 0.67))
+                                        .foregroundStyle(.white)
+                                }
+
+                                Spacer()
+
+                                Button { isPlaying.toggle() } label: {
+                                    Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
+                                        .font(.system(size: playButtonSize))
+                                        .foregroundStyle(.white)
+                                }
+
+                                Spacer()
+
+                                Button { } label: {
+                                    Image(systemName: "forward.fill")
+                                        .font(.system(size: controlButtonSize * 0.67))
+                                        .foregroundStyle(.white)
+                                }
+
+                                Spacer()
+
+                                Button { } label: {
+                                    Image(systemName: "chevron.forward.2")
+                                        .font(.system(size: controlButtonSize * 0.45))
+                                        .foregroundStyle(.white.opacity(0.8))
+                                }
+                            }
+                            .padding(.horizontal, 24)
+                            .padding(.bottom, 24)
+
+                            // Markers strip
+                            if let markedSong {
+                                HorizontalMarkerStrip(
+                                    markers: markedSong.sortedMarkers,
+                                    onTap: { _ in },
+                                    onAddMarker: { },
+                                    onMarkerEdit: { _ in },
+                                    onMarkerDelete: { _ in }
+                                )
+                                .padding(.bottom, 12)
+                                .frame(maxWidth: availableWidth)
+                            }
+
+                            // Cue time selector
+                            VStack(spacing: 6) {
+                                Text("Cue Time")
+                                    .font(.caption)
+                                    .foregroundStyle(.white.opacity(0.7))
+                                    .padding(.horizontal)
+
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 8) {
+                                        ForEach(cueTimeOptions, id: \.self) { cueTime in
+                                            Button {
+                                                defaultCueTime = cueTime
+                                            } label: {
+                                                Text(formatCueTime(cueTime))
+                                                    .font(.subheadline)
+                                                    .fontWeight(defaultCueTime == cueTime ? .bold : .medium)
+                                                    .foregroundStyle(defaultCueTime == cueTime ? .black : .white)
+                                                    .padding(.horizontal, 16)
+                                                    .padding(.vertical, 8)
+                                                    .background(defaultCueTime == cueTime ? .white : .white.opacity(0.2))
+                                                    .cornerRadius(16)
+                                                    .scaleEffect(defaultCueTime == cueTime ? 1.05 : 1.0)
+                                                    .shadow(color: defaultCueTime == cueTime ? .white.opacity(0.3) : .clear, radius: 8)
+                                            }
+                                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: defaultCueTime)
+                                        }
+                                    }
+                                    .padding(.horizontal, 24)
+                                }
+                                .frame(maxWidth: availableWidth)
+                            }
+                            .padding(.bottom, 8)
+                        }
+                        .frame(maxWidth: availableWidth, alignment: .center)
+                        .padding(.bottom, bottomSafeArea + 8)
+                    }
+                }
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Menu {
+                        Button { } label: {
+                            Label("Recently Marked", systemImage: "clock.arrow.circlepath")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .font(.title3)
+                            .foregroundStyle(.white)
+                    }
+                }
+            }
+        }
+    }
+
+    private func formatTime(_ time: TimeInterval) -> String {
+        let minutes = Int(time) / 60
+        let seconds = Int(time) % 60
+        return String(format: "%d:%02d", minutes, seconds)
+    }
+
+    private func formatCueTime(_ seconds: Double) -> String {
+        if seconds == 0 {
+            return "0s"
+        } else if seconds < 60 {
+            return "\(Int(seconds))s"
+        } else {
+            let minutes = Int(seconds / 60)
+            return "\(minutes)m"
+        }
+    }
+}
+
+#Preview("With Markers") {
+    let container = createPreviewContainer()
+    return NowPlayingViewPreview(container: container)
+        .modelContainer(container)
+}
+
+#Preview("iPhone SE") {
+    let container = createPreviewContainer()
+    return NowPlayingViewPreview(container: container)
+        .modelContainer(container)
+        .previewDevice(PreviewDevice(rawValue: "iPhone SE (3rd generation)"))
+}
+
+#Preview("iPhone 15 Pro Max") {
+    let container = createPreviewContainer()
+    return NowPlayingViewPreview(container: container)
+        .modelContainer(container)
+        .previewDevice(PreviewDevice(rawValue: "iPhone 15 Pro Max"))
+}
+
+#Preview("Landscape") {
+    let container = createPreviewContainer()
+    return NowPlayingViewPreview(container: container)
+        .modelContainer(container)
+        .previewInterfaceOrientation(.landscapeRight)
 }
