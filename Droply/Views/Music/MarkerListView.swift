@@ -87,15 +87,49 @@ struct MarkerRow: View {
 struct HorizontalMarkerStrip: View {
     let markers: [SongMarker]
     let onTap: (SongMarker) -> Void
+    let onAddMarker: () -> Void
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                ForEach(markers) { marker in
-                    MarkerPill(marker: marker)
-                        .onTapGesture {
-                            onTap(marker)
-                        }
+                // Add Marker button (always on leading edge)
+                Button {
+                    onAddMarker()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.body)
+                        Text("Add Marker")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(
+                        Capsule()
+                            .fill(.white.opacity(0.3))
+                    )
+                    .overlay(
+                        Capsule()
+                            .stroke(.white.opacity(0.4), lineWidth: 1)
+                    )
+                }
+
+                if markers.isEmpty {
+                    // Placeholder when no markers
+                    Text("No markers yet")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.5))
+                        .padding(.horizontal, 8)
+                } else {
+                    // Existing markers
+                    ForEach(markers) { marker in
+                        MarkerPill(marker: marker)
+                            .onTapGesture {
+                                onTap(marker)
+                            }
+                    }
                 }
             }
             .padding(.horizontal)
@@ -158,7 +192,8 @@ struct MarkerPill: View {
             SongMarker(timestamp: 150, emoji: "💪", name: "Final push"),
             SongMarker(timestamp: 200, emoji: "🎹", name: "Bridge")
         ],
-        onTap: { _ in }
+        onTap: { _ in },
+        onAddMarker: { }
     )
     .padding()
     .background(Color.black)

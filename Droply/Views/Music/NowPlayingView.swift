@@ -89,21 +89,22 @@ struct NowPlayingView: View {
                         )
                         .frame(height: 100)
                         .padding(.horizontal)
-                        .padding(.bottom, 8)
+                        .padding(.bottom, 4)
 
                         // Time labels
-                        HStack {
+                        VStack(spacing: 8) {
                             Text(formatTime(musicService.playbackTime))
-                                .font(.caption)
+                                .font(.system(size: 48, weight: .bold, design: .rounded))
                                 .monospacedDigit()
-                            Spacer()
+                                .foregroundStyle(.white)
+                                .contentTransition(.numericText())
+
                             Text(formatTime(musicService.playbackDuration))
                                 .font(.caption)
                                 .monospacedDigit()
+                                .foregroundStyle(.white.opacity(0.7))
                         }
-                        .foregroundStyle(.white.opacity(0.7))
-                        .padding(.horizontal, 30)
-                        .padding(.bottom, 16)
+                        .padding(.bottom, 8)
 
                         // Playback controls
                         HStack(spacing: 40) {
@@ -145,20 +146,21 @@ struct NowPlayingView: View {
                         }
                         .padding(.bottom, 12)
 
-                        // Markers strip
-                        if let markers = markedSong?.sortedMarkers, !markers.isEmpty {
-                            HorizontalMarkerStrip(
-                                markers: markers,
-                                onTap: { marker in
-                                    Task {
-                                        let startTime = max(0, marker.timestamp - defaultBufferTime)
-                                        await musicService.seek(to: startTime)
-                                        try? await musicService.play()
-                                    }
+                        // Markers strip (always visible)
+                        HorizontalMarkerStrip(
+                            markers: markedSong?.sortedMarkers ?? [],
+                            onTap: { marker in
+                                Task {
+                                    let startTime = max(0, marker.timestamp - defaultBufferTime)
+                                    await musicService.seek(to: startTime)
+                                    try? await musicService.play()
                                 }
-                            )
-                            .padding(.bottom, 8)
-                        }
+                            },
+                            onAddMarker: {
+                                showingAddMarker = true
+                            }
+                        )
+                        .padding(.bottom, 8)
 
                         // Buffer selector
                         VStack(spacing: 8) {
@@ -169,23 +171,6 @@ struct NowPlayingView: View {
                             bufferSelector
                         }
                         .padding(.bottom, 12)
-
-                        // Add marker button
-                        Button {
-                            showingAddMarker = true
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "bookmark.fill")
-                                Text("Add Marker")
-                            }
-                            .font(.subheadline)
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 10)
-                            .background(.white.opacity(0.2))
-                            .cornerRadius(20)
-                        }
-                        .disabled(musicService.currentSong == nil)
 
                         Spacer()
                     } else {
@@ -222,16 +207,16 @@ struct NowPlayingView: View {
     @ViewBuilder
     private func albumArtwork(for song: Song) -> some View {
         if let artwork = song.artwork {
-            ArtworkImage(artwork, width: 240, height: 240)
+            ArtworkImage(artwork, width: 320, height: 320)
                 .cornerRadius(12)
                 .shadow(radius: 10)
         } else {
             RoundedRectangle(cornerRadius: 12)
                 .fill(.ultraThinMaterial)
-                .frame(width: 240, height: 240)
+                .frame(width: 320, height: 320)
                 .overlay {
                     Image(systemName: "music.note")
-                        .font(.system(size: 70))
+                        .font(.system(size: 90))
                         .foregroundStyle(.secondary)
                 }
         }
