@@ -611,7 +611,10 @@ struct NowPlayingView: View {
 //                }
             }
             .toolbarBackground(.visible, for: .bottomBar)
-            .sheet(isPresented: $showingAddMarker) {
+            .sheet(isPresented: $showingAddMarker, onDismiss: {
+                // Refresh markedSong after adding a marker
+                updateMarkedSong(for: musicService.currentSong)
+            }) {
                 if let song = musicService.currentSong {
                     AddMarkerView(
                         currentTime: musicService.playbackTime,
@@ -619,7 +622,10 @@ struct NowPlayingView: View {
                     )
                 }
             }
-            .sheet(isPresented: $showingEditMarker) {
+            .sheet(isPresented: $showingEditMarker, onDismiss: {
+                // Refresh markedSong after editing a marker
+                updateMarkedSong(for: musicService.currentSong)
+            }) {
                 if let marker = markerToEdit {
                     EditMarkerView(marker: marker)
                 }
