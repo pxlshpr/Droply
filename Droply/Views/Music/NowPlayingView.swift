@@ -74,102 +74,106 @@ struct NowPlayingView: View {
 
                     // Marker timeline
                     MarkerTimelineView(
-                            currentTime: musicService.playbackTime,
-                            duration: musicService.playbackDuration,
-                            markers: markedSong?.sortedMarkers ?? [],
-                            musicService: musicService,
-                            onMarkerTap: { marker in
-                                selectedMarker = marker
-                                Task {
-                                    let startTime = max(0, marker.timestamp - defaultBufferTime)
-                                    await musicService.seek(to: startTime)
-                                    try? await musicService.play()
-                                }
+                        currentTime: musicService.playbackTime,
+                        duration: musicService.playbackDuration,
+                        markers: markedSong?.sortedMarkers ?? [],
+                        musicService: musicService,
+                        onMarkerTap: { marker in
+                            selectedMarker = marker
+                            Task {
+                                let startTime = max(0, marker.timestamp - defaultBufferTime)
+                                await musicService.seek(to: startTime)
+                                try? await musicService.play()
                             }
-                        )
-                        .frame(height: 100)
-                        .padding(.horizontal)
+                        }
+                    )
+                    .frame(height: 100)
+                    .padding(.horizontal)
 
-                        // Time labels
-                        VStack(spacing: 4) {
-                            Text(formatTime(musicService.playbackTime))
-                                .font(.system(size: 48, weight: .bold, design: .rounded))
-                                .monospacedDigit()
+                    // Time labels
+                    HStack(alignment: .lastTextBaseline, spacing: 8) {
+                        Text(formatTime(musicService.playbackTime))
+                            .font(.system(size: 48, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(.white)
+                            .contentTransition(.numericText())
+
+                        Text("/")
+                            .font(.system(size: 24, weight: .medium, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.5))
+
+                        Text(formatTime(musicService.playbackDuration))
+                            .font(.system(size: 24, weight: .medium, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(.white.opacity(0.7))
+                    }
+                    .padding(.bottom, 20)
+
+                    // Playback controls
+                    HStack(spacing: 40) {
+                        // Previous button
+                        Button {
+                            Task {
+                                try? await musicService.skipToPreviousItem()
+                            }
+                        } label: {
+                            Image(systemName: "backward.fill")
+                                .font(.system(size: 32))
                                 .foregroundStyle(.white)
-                                .contentTransition(.numericText())
-
-                            Text(formatTime(musicService.playbackDuration))
-                                .font(.caption)
-                                .monospacedDigit()
-                                .foregroundStyle(.white.opacity(0.7))
                         }
-                        .padding(.bottom, 20)
+                        .buttonStyle(.plain)
 
-                        // Playback controls
-                        HStack(spacing: 40) {
-                            // Previous button
-                            Button {
-                                Task {
-                                    try? await musicService.skipToPreviousItem()
-                                }
-                            } label: {
-                                Image(systemName: "backward.fill")
-                                    .font(.system(size: 32))
-                                    .foregroundStyle(.white)
+                        // Play/Pause button
+                        Button {
+                            Task {
+                                try? await musicService.togglePlayPause()
                             }
-                            .buttonStyle(.plain)
-
-                            // Play/Pause button
-                            Button {
-                                Task {
-                                    try? await musicService.togglePlayPause()
-                                }
-                            } label: {
-                                Image(systemName: musicService.isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                                    .font(.system(size: 56))
-                                    .foregroundStyle(.white)
-                            }
-                            .buttonStyle(.plain)
-
-                            // Next button
-                            Button {
-                                Task {
-                                    try? await musicService.skipToNextItem()
-                                }
-                            } label: {
-                                Image(systemName: "forward.fill")
-                                    .font(.system(size: 32))
-                                    .foregroundStyle(.white)
-                            }
-                            .buttonStyle(.plain)
+                        } label: {
+                            Image(systemName: musicService.isPlaying ? "pause.circle.fill" : "play.circle.fill")
+                                .font(.system(size: 56))
+                                .foregroundStyle(.white)
                         }
-                        .padding(.bottom, 20)
+                        .buttonStyle(.plain)
 
-                        // Markers strip (always visible)
-                        HorizontalMarkerStrip(
-                            markers: markedSong?.sortedMarkers ?? [],
-                            onTap: { marker in
-                                Task {
-                                    let startTime = max(0, marker.timestamp - defaultBufferTime)
-                                    await musicService.seek(to: startTime)
-                                    try? await musicService.play()
-                                }
-                            },
-                            onAddMarker: {
-                                showingAddMarker = true
+                        // Next button
+                        Button {
+                            Task {
+                                try? await musicService.skipToNextItem()
                             }
-                        )
-                        .padding(.bottom, 16)
-
-                        // Buffer selector
-                        VStack(spacing: 8) {
-                            Text("Buffer Time")
-                                .font(.caption)
-                                .foregroundStyle(.white.opacity(0.7))
-
-                            bufferSelector
+                        } label: {
+                            Image(systemName: "forward.fill")
+                                .font(.system(size: 32))
+                                .foregroundStyle(.white)
                         }
-                        .padding(.bottom, 12)
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.bottom, 20)
+
+                    // Markers strip (always visible)
+                    HorizontalMarkerStrip(
+                        markers: markedSong?.sortedMarkers ?? [],
+                        onTap: { marker in
+                            Task {
+                                let startTime = max(0, marker.timestamp - defaultBufferTime)
+                                await musicService.seek(to: startTime)
+                                try? await musicService.play()
+                            }
+                        },
+                        onAddMarker: {
+                            showingAddMarker = true
+                        }
+                    )
+                    .padding(.bottom, 16)
+
+                    // Buffer selector
+                    VStack(spacing: 8) {
+                        Text("Buffer Time")
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.7))
+
+                        bufferSelector
+                    }
+                    .padding(.bottom, 12)
 
                     Spacer()
                 } else {
@@ -187,21 +191,21 @@ struct NowPlayingView: View {
             }
         }
         .sheet(isPresented: $showingAddMarker) {
-                if let song = musicService.currentSong {
-                    AddMarkerView(
-                        currentTime: musicService.playbackTime,
-                        markedSong: getOrCreateMarkedSong(from: song)
-                    )
-                }
+            if let song = musicService.currentSong {
+                AddMarkerView(
+                    currentTime: musicService.playbackTime,
+                    markedSong: getOrCreateMarkedSong(from: song)
+                )
             }
-            .onChange(of: musicService.currentSong) { _, newSong in
-                updateMarkedSong(for: newSong)
-                extractColorsFromArtwork(for: newSong)
-            }
-            .onAppear {
-                updateMarkedSong(for: musicService.currentSong)
-                extractColorsFromArtwork(for: musicService.currentSong)
-            }
+        }
+        .onChange(of: musicService.currentSong) { _, newSong in
+            updateMarkedSong(for: newSong)
+            extractColorsFromArtwork(for: newSong)
+        }
+        .onAppear {
+            updateMarkedSong(for: musicService.currentSong)
+            extractColorsFromArtwork(for: musicService.currentSong)
+        }
     }
 
     // MARK: - Views
