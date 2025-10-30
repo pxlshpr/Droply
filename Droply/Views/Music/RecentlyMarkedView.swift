@@ -170,21 +170,20 @@ struct RecentlyMarkedView: View {
                 return
             }
 
-            // Prepare the song in its album context without playing it yet
-            try await musicService.prepareToPlaySongInContext(song)
+            // Prepend the song to the system queue and start playing
+            try await musicService.prependSongToSystemQueue(song)
 
-            // Handle play mode
+            // Handle play mode - seek after starting playback
             switch playMode {
             case .startOfSong:
-                // Start at beginning
-                try? await musicService.play()
+                // Already playing from beginning
+                break
             case .cueAtFirstMarker:
-                // Seek to first marker if available, then play
+                // Seek to first marker if available
                 if let firstMarker = markedSong.sortedMarkers.first {
                     let startTime = max(0, firstMarker.timestamp - (firstMarker.cueTime))
                     await musicService.seek(to: startTime)
                 }
-                try? await musicService.play()
             }
 
             // Update last played at
@@ -228,21 +227,20 @@ struct RecentlyMarkedView: View {
                 return
             }
 
-            // Prepare the queue with all songs
-            try await musicService.prepareToPlaySongs(songs)
+            // Prepend all songs to the system queue and start playing
+            try await musicService.prependSongsToSystemQueue(songs)
 
-            // Handle play mode for the first song
+            // Handle play mode for the first song - seek after starting playback
             switch playMode {
             case .startOfSong:
-                // Start at beginning of first song
-                try? await musicService.play()
+                // Already playing from beginning of first song
+                break
             case .cueAtFirstMarker:
-                // Seek to first marker of the first song if available, then play
+                // Seek to first marker of the first song if available
                 if let firstMarker = recentlyMarkedSongs.first?.sortedMarkers.first {
                     let startTime = max(0, firstMarker.timestamp - (firstMarker.cueTime))
                     await musicService.seek(to: startTime)
                 }
-                try? await musicService.play()
             }
 
             // Update last played at for all songs

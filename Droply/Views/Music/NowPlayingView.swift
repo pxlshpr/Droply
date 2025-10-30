@@ -332,6 +332,29 @@ struct NowPlayingView: View {
                 }
             }
             }
+            .overlay(alignment: .bottom) {
+                if currentVisualizationMode == .button {
+                    VStack(spacing: 0) {
+                        Spacer()
+
+                        CueButtonVisualization(
+                            progress: cueManager.cueProgress,
+                            cueTime: defaultCueTime,
+                            isActive: cueManager.currentCue != nil,
+                            onTap: {
+                                showingCueTimeSelector = true
+                            }
+                        )
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 8)
+                        .background(
+                            Rectangle()
+                                .fill(.ultraThinMaterial)
+                                .ignoresSafeArea(edges: .bottom)
+                        )
+                    }
+                }
+            }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -364,31 +387,20 @@ struct NowPlayingView: View {
                     }
                 }
 
-                ToolbarItem(placement: .bottomBar) {
-                    if currentVisualizationMode == .button {
-                        CueButtonVisualization(
-                            progress: cueManager.cueProgress,
-                            cueTime: defaultCueTime,
-                            isActive: cueManager.currentCue != nil,
-                            onTap: {
-                                showingCueTimeSelector = true
-                            }
-                        )
-                        .frame(maxWidth: .infinity)
-                    } else {
-                        Button {
-                            showingCueTimeSelector = true
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "timer")
-                                Text(formatCueTime(defaultCueTime))
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
+//                ToolbarItem(placement: .bottomBar) {
+//                    Button {
+//                        showingCueTimeSelector = true
+//                    } label: {
+//                        HStack(spacing: 4) {
+//                            Image(systemName: "timer")
+//                            Text(formatCueTime(defaultCueTime))
+//                                .font(.subheadline)
+//                                .fontWeight(.medium)
+//                        }
+//                    }
+//                    .frame(maxWidth: .infinity, alignment: .leading)
+//                    .opacity(currentVisualizationMode == .button ? 0 : 1)
+//                }
             }
             .toolbarBackground(.visible, for: .bottomBar)
             .sheet(isPresented: $showingAddMarker) {

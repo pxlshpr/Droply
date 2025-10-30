@@ -436,81 +436,64 @@ class MusicKitService: ObservableObject {
         await seek(to: startTime)
     }
 
-    func prepareToPlaySongInContext(_ song: Song) async throws {
-        logger.info("Preparing to play song in context: \(song.title) by \(song.artistName)")
+    func prependSongToSystemQueue(_ song: Song) async throws {
+        logger.info("Prepending song to system queue: \(song.title) by \(song.artistName)")
 
-        // Try to fetch the song's album to play in context
-        do {
-            // Request the song with its albums relationship
-            let detailedSongRequest = MusicCatalogResourceRequest<Song>(matching: \.id, equalTo: song.id)
-            let detailedSongResponse = try await detailedSongRequest.response()
+        // Convert MusicKit Song to store ID
+        let storeID = song.id.rawValue
 
-            guard let detailedSong = detailedSongResponse.items.first else {
-                logger.warning("Could not fetch detailed song, falling back to single-song queue")
-                try await prepareToPlaySong(song)
-                return
-            }
+        // Create queue descriptor
+        let queueDescriptor = MPMusicPlayerStoreQueueDescriptor(storeIDs: [storeID])
 
-            // Try to get the first album
-            if let albums = detailedSong.albums, let firstAlbum = albums.first {
-                logger.info("Found album: \(firstAlbum.title) - fetching tracks")
+        // Prepend to system player queue (adds to beginning)
+        systemPlayer.prepend(queueDescriptor)
+        logger.debug("Prepended song to system queue")
 
-                // Fetch the full album with tracks
-                let albumRequest = MusicCatalogResourceRequest<Album>(matching: \.id, equalTo: firstAlbum.id)
-                let albumResponse = try await albumRequest.response()
+        // Skip to beginning (where we just added the song)
+        systemPlayer.skipToBeginning()
+        logger.debug("Skipped to beginning of queue")
 
-                if let fullAlbum = albumResponse.items.first, let tracks = fullAlbum.tracks {
-                    // Convert tracks to songs (tracks in MusicKit albums are Songs)
-                    let songArray = Array(tracks).compactMap { track -> Song? in
-                        // Tracks from album.tracks are actually Song objects
-                        return track as? Song
-                    }
+        // Start playing
+        systemPlayer.play()
+        logger.info("System player started playing prepended song")
 
-                    guard !songArray.isEmpty else {
-                        logger.warning("Could not convert album tracks to songs, falling back to single-song queue")
-                        try await prepareToPlaySong(song)
-                        return
-                    }
-
-                    logger.info("Creating queue with \(songArray.count) songs from album, starting at: \(song.title)")
-
-                    // Create queue with all album tracks, starting at the selected song
-                    player.queue = ApplicationMusicPlayer.Queue(for: songArray, startingAt: song)
-
-                    // Update current song immediately
-                    currentSong = song
-                    playbackDuration = song.duration ?? 0
-                    logger.debug("Queue set with album context")
-                    return
-                }
-            }
-
-            // If we couldn't get album tracks, fall back to single song
-            logger.warning("Could not fetch album tracks, falling back to single-song queue")
-            try await prepareToPlaySong(song)
-
-        } catch {
-            logger.error("Error fetching song context: \(error.localizedDescription), falling back to single-song queue")
-            try await prepareToPlaySong(song)
-        }
+        // Update current song immediately for UI responsiveness
+        currentSong = song
+        playbackDuration = song.duration ?? 0
+        isPlaying = true
     }
 
-    func prepareToPlaySongs(_ songs: [Song], startingAt startSong: Song? = nil) async throws {
+    func prependSongsToSystemQueue(_ songs: [Song]) async throws {
         guard !songs.isEmpty else {
-            logger.warning("Attempted to play empty song list")
+            logger.warning("Attempted to prepend empty song list")
             throw MusicKitError.notFound
         }
 
-        let startingSong = startSong ?? songs[0]
-        logger.info("Preparing queue with \(songs.count) songs, starting at: \(startingSong.title)")
+        logger.info("Prepending \(songs.count) songs to system queue")
 
-        player.queue = ApplicationMusicPlayer.Queue(for: songs, startingAt: startingSong)
+        // Convert MusicKit Songs to store IDs
+        let storeIDs = songs.map { $0.id.rawValue }
 
-        // Update current song immediately
-        currentSong = startingSong
-        playbackDuration = startingSong.duration ?? 0
+        // Create queue descriptor
+        let queueDescriptor = MPMusicPlayerStoreQueueDescriptor(storeIDs: storeIDs)
 
-        logger.debug("Queue set with \(songs.count) songs")
+        // Prepend to system player queue (adds to beginning)
+        systemPlayer.prepend(queueDescriptor)
+        logger.debug("Prepended \(songs.count) songs to system queue")
+
+        // Skip to beginning (where we just added the songs)
+        systemPlayer.skipToBeginning()
+        logger.debug("Skipped to beginning of queue")
+
+        // Start playing
+        systemPlayer.play()
+        logger.info("System player started playing prepended songs")
+
+        // Update current song immediately for UI responsiveness (first song in list)
+        let firstSong = songs[0]
+        currentSong = firstSong
+        playbackDuration = firstSong.duration ?? 0
+        isPlaying = true
     }
 
     // MARK: - Search

@@ -19,85 +19,86 @@ struct CueMarkerVisualization: View {
 
     var body: some View {
         Button(action: onTap) {
-            GeometryReader { geometry in
-                ZStack(alignment: .leading) {
-                    // Background
-                    Capsule()
-                        .fill(.white.opacity(0.2))
-                        .overlay(
-                            Capsule()
-                                .stroke(.white.opacity(0.3), lineWidth: 1)
-                        )
+            HStack(spacing: 6) {
+                Text(marker.emoji)
+                    .font(.body)
 
-                    // Progress fill with sparkly gradient
-                    if isActive && progress > 0 {
-                        ZStack {
-                            // Main gradient fill
-                            LinearGradient(
-                                colors: [
-                                    .pink.opacity(0.9),
-                                    .purple.opacity(0.9),
-                                    .blue.opacity(0.9),
-                                    .cyan.opacity(0.9)
-                                ],
-                                startPoint: .leading,
-                                endPoint: .trailing
+                Text(formatTime(marker.timestamp))
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .monospacedDigit()
+                    .foregroundStyle(.white)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        // Background capsule
+                        Capsule()
+                            .fill(.white.opacity(0.2))
+                            .overlay(
+                                Capsule()
+                                    .stroke(.white.opacity(0.3), lineWidth: 1)
                             )
 
-                            // Shimmer effect overlay
-                            LinearGradient(
-                                colors: [
-                                    .clear,
-                                    .white.opacity(0.4),
-                                    .clear
-                                ],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                            .offset(x: shimmerOffset * geometry.size.width)
+                        // Progress fill with sparkly gradient
+                        if isActive && progress > 0 {
+                            ZStack {
+                                // Main gradient fill
+                                LinearGradient(
+                                    colors: [
+                                        .pink.opacity(0.9),
+                                        .purple.opacity(0.9),
+                                        .blue.opacity(0.9),
+                                        .cyan.opacity(0.9)
+                                    ],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
 
-                            // Sparkle particles
-                            Canvas { context, size in
-                                let particleCount = 6
-                                for i in 0..<particleCount {
-                                    let x = (CGFloat(i) / CGFloat(particleCount)) * size.width * CGFloat(progress)
-                                    let y = size.height / 2 + sin(shimmerOffset * 10 + CGFloat(i)) * 3
-                                    let opacity = (sin(shimmerOffset * 5 + CGFloat(i)) + 1) / 2
+                                // Shimmer effect overlay
+                                LinearGradient(
+                                    colors: [
+                                        .clear,
+                                        .white.opacity(0.4),
+                                        .clear
+                                    ],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                                .offset(x: shimmerOffset * geometry.size.width)
 
-                                    context.opacity = opacity * 0.6
-                                    context.fill(
-                                        Circle().path(in: CGRect(x: x - 1.5, y: y - 1.5, width: 3, height: 3)),
-                                        with: .color(.white)
-                                    )
+                                // Sparkle particles
+                                Canvas { context, size in
+                                    let particleCount = 6
+                                    let fillWidth = size.width * CGFloat(progress)
+                                    for i in 0..<particleCount {
+                                        let x = (CGFloat(i) / CGFloat(particleCount)) * fillWidth
+                                        let y = size.height / 2 + sin(shimmerOffset * 10 + CGFloat(i)) * 3
+                                        let opacity = (sin(shimmerOffset * 5 + CGFloat(i)) + 1) / 2
+
+                                        context.opacity = opacity * 0.6
+                                        context.fill(
+                                            Circle().path(in: CGRect(x: x - 1.5, y: y - 1.5, width: 3, height: 3)),
+                                            with: .color(.white)
+                                        )
+                                    }
+                                }
+                            }
+                            .frame(width: geometry.size.width * CGFloat(progress))
+                            .animation(.linear, value: progress)
+                            .clipShape(Capsule())
+                            .shadow(color: .purple.opacity(0.6), radius: 6)
+                            .onAppear {
+                                withAnimation(.linear(duration: 1.5).repeatForever(autoreverses: false)) {
+                                    shimmerOffset = 2
                                 }
                             }
                         }
-                        .frame(width: geometry.size.width * CGFloat(progress))
-                        .clipShape(Capsule())
-                        .shadow(color: .purple.opacity(0.6), radius: 6)
-                        .onAppear {
-                            withAnimation(.linear(duration: 1.5).repeatForever(autoreverses: false)) {
-                                shimmerOffset = 2
-                            }
-                        }
                     }
-
-                    // Content
-                    HStack(spacing: 6) {
-                        Text(marker.emoji)
-                            .font(.body)
-
-                        Text(formatTime(marker.timestamp))
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .monospacedDigit()
-                            .foregroundStyle(.white)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
                 }
-            }
-            .frame(height: 32)
+            )
         }
         .buttonStyle(.plain)
         .contextMenu {

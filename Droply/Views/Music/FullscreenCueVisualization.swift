@@ -81,6 +81,7 @@ struct FullscreenCueVisualization: View {
                             ),
                             style: StrokeStyle(lineWidth: 12, lineCap: .round)
                         )
+                        .animation(.linear, value: progress)
                         .frame(width: 280, height: 280)
                         .rotationEffect(.degrees(outerRingRotation))
                         .shadow(color: .purple.opacity(0.8), radius: 20)
