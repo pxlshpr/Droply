@@ -49,10 +49,9 @@ struct NowPlayingView: View {
                                 .foregroundStyle(.white.opacity(0.8))
                         }
                     } else if let song = musicService.currentSong {
-                        Spacer()
-
                         // Album artwork
                         albumArtwork(for: song)
+                            .padding(.top, 8)
                             .padding(.bottom, 16)
 
                         // Song info
@@ -89,10 +88,9 @@ struct NowPlayingView: View {
                         )
                         .frame(height: 100)
                         .padding(.horizontal)
-                        .padding(.bottom, 4)
 
                         // Time labels
-                        VStack(spacing: 8) {
+                        VStack(spacing: 4) {
                             Text(formatTime(musicService.playbackTime))
                                 .font(.system(size: 48, weight: .bold, design: .rounded))
                                 .monospacedDigit()
@@ -104,7 +102,7 @@ struct NowPlayingView: View {
                                 .monospacedDigit()
                                 .foregroundStyle(.white.opacity(0.7))
                         }
-                        .padding(.bottom, 8)
+                        .padding(.bottom, 20)
 
                         // Playback controls
                         HStack(spacing: 40) {
@@ -144,7 +142,7 @@ struct NowPlayingView: View {
                             }
                             .buttonStyle(.plain)
                         }
-                        .padding(.bottom, 12)
+                        .padding(.bottom, 20)
 
                         // Markers strip (always visible)
                         HorizontalMarkerStrip(
@@ -160,7 +158,7 @@ struct NowPlayingView: View {
                                 showingAddMarker = true
                             }
                         )
-                        .padding(.bottom, 8)
+                        .padding(.bottom, 16)
 
                         // Buffer selector
                         VStack(spacing: 8) {

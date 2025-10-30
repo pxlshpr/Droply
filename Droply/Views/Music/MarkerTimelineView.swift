@@ -75,7 +75,7 @@ struct MarkerTimelineView: View {
     private func markerView(for marker: SongMarker, geometry: GeometryProxy) -> some View {
         let position = (marker.timestamp / duration) * geometry.size.width
 
-        return VStack(spacing: 2) {
+        return VStack(spacing: 1) {
             Text(marker.emoji)
                 .font(.title3)
                 .background(
@@ -89,7 +89,7 @@ struct MarkerTimelineView: View {
 
             Rectangle()
                 .fill(.white)
-                .frame(width: 2, height: 20)
+                .frame(width: 2, height: 12)
 
             if marker.bufferTime > 0 {
                 // Show buffer indicator
