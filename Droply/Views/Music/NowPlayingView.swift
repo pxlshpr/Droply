@@ -270,7 +270,7 @@ struct NowPlayingView: View {
                             .frame(width: controlButtonSize)
                         }
                         .padding(.horizontal, 24)
-                        .padding(.bottom, 32)
+                        .padding(.bottom, 16)
 
                         Spacer()
 
@@ -334,6 +334,20 @@ struct NowPlayingView: View {
                                 }
                             )
                             .frame(maxWidth: availableWidth)
+                        }
+
+                        // Cue Button Visualization (when in button mode)
+                        if currentVisualizationMode == .button {
+                            CueButtonVisualization(
+                                progress: cueManager.cueProgress,
+                                cueTime: defaultCueTime,
+                                isActive: cueManager.currentCue != nil,
+                                onTap: {
+                                    showingCueTimeSelector = true
+                                }
+                            )
+                            .padding(.horizontal, 16)
+                            .padding(.top, 8)
                         }
                     }
                     .frame(maxWidth: availableWidth, alignment: .center)
@@ -484,7 +498,7 @@ struct NowPlayingView: View {
                             .frame(width: controlButtonSize)
                         }
                         .padding(.horizontal, 24)
-                        .padding(.bottom, 32)
+                        .padding(.bottom, 16)
 
                         Spacer()
 
@@ -520,6 +534,20 @@ struct NowPlayingView: View {
                                 .frame(maxWidth: availableWidth)
                             }
                         }
+
+                        // Cue Button Visualization (when in button mode)
+                        if currentVisualizationMode == .button {
+                            CueButtonVisualization(
+                                progress: cueManager.cueProgress,
+                                cueTime: defaultCueTime,
+                                isActive: cueManager.currentCue != nil,
+                                onTap: {
+                                    showingCueTimeSelector = true
+                                }
+                            )
+                            .padding(.horizontal, 16)
+                            .padding(.top, 8)
+                        }
                     }
                     .frame(maxWidth: availableWidth, alignment: .center)
                     .padding(.bottom, bottomSafeArea + 8)
@@ -534,29 +562,6 @@ struct NowPlayingView: View {
                 }
                 }
             }
-            }
-            .overlay(alignment: .bottom) {
-                if currentVisualizationMode == .button {
-                    VStack(spacing: 0) {
-                        Spacer()
-
-                        CueButtonVisualization(
-                            progress: cueManager.cueProgress,
-                            cueTime: defaultCueTime,
-                            isActive: cueManager.currentCue != nil,
-                            onTap: {
-                                showingCueTimeSelector = true
-                            }
-                        )
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 8)
-//                        .background(
-//                            Rectangle()
-//                                .fill(.ultraThinMaterial)
-//                                .ignoresSafeArea(edges: .bottom)
-//                        )
-                    }
-                }
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
