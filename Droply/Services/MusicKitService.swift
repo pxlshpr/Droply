@@ -283,10 +283,26 @@ class MusicKitService: ObservableObject {
 
     func togglePlayPause() async throws {
         logger.info("Toggling play/pause - current state: \(self.isPlaying ? "playing" : "paused")")
-        if isPlaying {
-            pause()
+
+        // Determine which player is active
+        if systemPlayer.playbackState == .playing || systemPlayer.nowPlayingItem != nil {
+            // Use system player for play/pause
+            logger.debug("Toggling play/pause on system player")
+            if isPlaying {
+                systemPlayer.pause()
+                isPlaying = false
+            } else {
+                systemPlayer.play()
+                isPlaying = true
+            }
         } else {
-            try await play()
+            // Use app player for play/pause
+            logger.debug("Toggling play/pause on app player")
+            if isPlaying {
+                pause()
+            } else {
+                try await play()
+            }
         }
     }
 
