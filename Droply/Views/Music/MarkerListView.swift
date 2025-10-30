@@ -87,37 +87,12 @@ struct MarkerRow: View {
 struct HorizontalMarkerStrip: View {
     let markers: [SongMarker]
     let onTap: (SongMarker) -> Void
-    let onAddMarker: () -> Void
     let onMarkerEdit: ((SongMarker) -> Void)?
     let onMarkerDelete: ((SongMarker) -> Void)?
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                // Add Marker button (always on leading edge)
-                Button {
-                    onAddMarker()
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.body)
-                        Text("Add Marker")
-                            .font(.caption)
-                            .fontWeight(.medium)
-                    }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(
-                        Capsule()
-                            .fill(.white.opacity(0.3))
-                    )
-                    .overlay(
-                        Capsule()
-                            .stroke(.white.opacity(0.4), lineWidth: 1)
-                    )
-                }
-
                 if markers.isEmpty {
                     // Placeholder when no markers
                     Text("No markers yet")
@@ -218,7 +193,6 @@ struct MarkerPill: View {
             SongMarker(timestamp: 200, emoji: "🎹", name: "Bridge")
         ],
         onTap: { _ in },
-        onAddMarker: { },
         onMarkerEdit: { _ in },
         onMarkerDelete: { _ in }
     )

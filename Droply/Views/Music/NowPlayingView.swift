@@ -134,24 +134,30 @@ struct NowPlayingView: View {
                         .padding(.horizontal, 24)
                         .padding(.bottom, 8)
 
-                        // Time labels
-                        HStack(alignment: .lastTextBaseline, spacing: 6) {
-                            Text(formatTime(musicService.playbackTime))
-                                .font(.system(size: timeFontSize, weight: .bold, design: .rounded))
-                                .monospacedDigit()
-                                .foregroundStyle(.white)
-                                .contentTransition(.numericText())
+                        // Time labels - tap to add marker
+                        Button {
+                            showingAddMarker = true
+                        } label: {
+                            HStack(alignment: .lastTextBaseline, spacing: 6) {
+                                Text(formatTime(musicService.playbackTime))
+                                    .font(.system(size: timeFontSize, weight: .bold, design: .rounded))
+                                    .monospacedDigit()
+                                    .foregroundStyle(.white)
+                                    .contentTransition(.numericText())
 
-                            Text("/")
-                                .font(.system(size: timeFontSize * 0.5, weight: .medium, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.5))
+                                Text("/")
+                                    .font(.system(size: timeFontSize * 0.5, weight: .medium, design: .rounded))
+                                    .foregroundStyle(.white.opacity(0.5))
 
-                            Text(formatTime(musicService.playbackDuration))
-                                .font(.system(size: timeFontSize * 0.5, weight: .medium, design: .rounded))
-                                .monospacedDigit()
-                                .foregroundStyle(.white.opacity(0.7))
+                                Text(formatTime(musicService.playbackDuration))
+                                    .font(.system(size: timeFontSize * 0.5, weight: .medium, design: .rounded))
+                                    .monospacedDigit()
+                                    .foregroundStyle(.white.opacity(0.7))
+                            }
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 12)
                         }
-                        .padding(.horizontal, 24)
+                        .buttonStyle(.glassProminent)
                         .padding(.bottom, 24)
 
                         // Playback controls
@@ -239,9 +245,6 @@ struct NowPlayingView: View {
                                     await musicService.seek(to: startTime)
                                     try? await musicService.play()
                                 }
-                            },
-                            onAddMarker: {
-                                showingAddMarker = true
                             },
                             onMarkerEdit: { marker in
                                 markerToEdit = marker
@@ -772,7 +775,6 @@ struct NowPlayingViewPreview: View {
                                 HorizontalMarkerStrip(
                                     markers: markedSong.sortedMarkers,
                                     onTap: { _ in },
-                                    onAddMarker: { },
                                     onMarkerEdit: { _ in },
                                     onMarkerDelete: { _ in }
                                 )
