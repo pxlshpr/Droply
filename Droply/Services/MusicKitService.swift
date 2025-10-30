@@ -399,8 +399,24 @@ class MusicKitService: ObservableObject {
     func playSong(_ song: Song) async throws {
         logger.info("Setting up queue to play song: \(song.title) by \(song.artistName)")
         player.queue = ApplicationMusicPlayer.Queue(for: [song], startingAt: song)
+
+        // Explicitly update currentSong immediately for UI responsiveness
+        currentSong = song
+        playbackDuration = song.duration ?? 0
+
         logger.debug("Queue set, attempting to play")
         try await play()
+    }
+
+    func prepareToPlaySong(_ song: Song) async throws {
+        logger.info("Preparing queue for song: \(song.title) by \(song.artistName) (without playing)")
+        player.queue = ApplicationMusicPlayer.Queue(for: [song], startingAt: song)
+
+        // Explicitly update currentSong immediately for UI responsiveness
+        currentSong = song
+        playbackDuration = song.duration ?? 0
+
+        logger.debug("Queue set, ready to play")
     }
 
     func playSongAtPosition(_ song: Song, startTime: TimeInterval) async throws {

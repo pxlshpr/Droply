@@ -293,6 +293,7 @@ struct NowPlayingView: View {
                                 .fontWeight(.medium)
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             .toolbarBackground(.visible, for: .bottomBar)
@@ -793,7 +794,22 @@ struct NowPlayingViewPreview: View {
                             .foregroundStyle(.white)
                     }
                 }
+
+                ToolbarItem(placement: .bottomBar) {
+                    Button {
+                        // Preview button action
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "timer")
+                            Text(formatCueTime(defaultCueTime))
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
+            .toolbarBackground(.visible, for: .bottomBar)
         }
     }
 

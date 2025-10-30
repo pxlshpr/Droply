@@ -153,16 +153,16 @@ struct RecentlyMarkedView: View {
                 return
             }
 
-            // Play the song
-            try await musicService.playSong(song)
+            // Prepare the song without playing it yet
+            try await musicService.prepareToPlaySong(song)
 
             // Handle play mode
             switch playMode {
             case .startOfSong:
-                // Already starts at beginning, just ensure it's playing
+                // Start at beginning
                 try? await musicService.play()
             case .cueAtFirstMarker:
-                // Seek to first marker if available
+                // Seek to first marker if available, then play
                 if let firstMarker = markedSong.sortedMarkers.first {
                     let startTime = max(0, firstMarker.timestamp - (firstMarker.cueTime))
                     await musicService.seek(to: startTime)
