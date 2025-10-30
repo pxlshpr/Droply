@@ -20,6 +20,7 @@ final class MarkedSong {
     var duration: TimeInterval = 0
     var createdAt: Date = Date()
     var lastPlayedAt: Date?
+    var lastMarkedAt: Date?
 
     @Relationship(deleteRule: .cascade, inverse: \SongMarker.song)
     var markers: [SongMarker]?

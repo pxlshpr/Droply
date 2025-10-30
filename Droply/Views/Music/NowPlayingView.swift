@@ -15,6 +15,7 @@ struct NowPlayingView: View {
     @State private var markedSong: MarkedSong?
     @State private var showingAddMarker = false
     @State private var showingEditMarker = false
+    @State private var showingRecentlyMarked = false
     @State private var markerToEdit: SongMarker?
     @State private var selectedMarker: SongMarker?
     @State private var backgroundColor1: Color = .purple.opacity(0.3)
@@ -26,17 +27,18 @@ struct NowPlayingView: View {
     private let bufferOptions: [Double] = [0, 5, 10, 15, 30, 45, 60, 90, 120]
 
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                // Dynamic background gradient from artwork colors
-                LinearGradient(
-                    colors: [backgroundColor1, backgroundColor2],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
-                .animation(.easeInOut(duration: 0.8), value: backgroundColor1)
-                .animation(.easeInOut(duration: 0.8), value: backgroundColor2)
+        NavigationStack {
+            GeometryReader { geometry in
+                ZStack {
+                    // Dynamic background gradient from artwork colors
+                    LinearGradient(
+                        colors: [backgroundColor1, backgroundColor2],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .ignoresSafeArea()
+                    .animation(.easeInOut(duration: 0.8), value: backgroundColor1)
+                    .animation(.easeInOut(duration: 0.8), value: backgroundColor2)
 
                 VStack(spacing: 0) {
                 if musicService.isCheckingPlayback {
@@ -53,10 +55,15 @@ struct NowPlayingView: View {
                     }
                     .padding(.horizontal)
                 } else if let song = musicService.currentSong {
-                    let safeHeight = geometry.size.height - geometry.safeAreaInsets.top - geometry.safeAreaInsets.bottom
+                    // Use full height since NavigationStack handles safe areas
+                    let availableHeight = geometry.size.height
+                    let availableWidth = geometry.size.width
 
-                    // Calculate sizes
-                    let artworkSize = min(safeHeight * 0.35, 280.0)
+                    // Calculate sizes - maximize artwork while fitting width
+                    let maxArtworkFromWidth = availableWidth - 32 // Account for horizontal padding
+                    let maxArtworkFromHeight = availableHeight * 0.45 // Use 45% of height
+                    let artworkSize = min(maxArtworkFromWidth, maxArtworkFromHeight)
+
                     let timelineHeight: CGFloat = 80
                     let timeFontSize: CGFloat = 40
                     let controlButtonSize: CGFloat = 48
@@ -66,9 +73,8 @@ struct NowPlayingView: View {
                         // Album artwork
                         albumArtwork(for: song)
                             .frame(width: artworkSize, height: artworkSize)
-                            .padding(.horizontal)
-                            .padding(.top, 8)
-                            .padding(.bottom, 12)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 16)
 
                         // Song info
                         VStack(spacing: 2) {
@@ -85,7 +91,7 @@ struct NowPlayingView: View {
                                 .lineLimit(1)
                         }
                         .padding(.horizontal)
-                        .padding(.bottom, 12)
+                        .padding(.bottom, 16)
 
                         // Marker timeline
                         MarkerTimelineView(
@@ -111,7 +117,7 @@ struct NowPlayingView: View {
                         )
                         .frame(height: timelineHeight)
                         .padding(.horizontal)
-                        .padding(.bottom, 12)
+                        .padding(.bottom, 16)
 
                         // Time labels
                         HStack(alignment: .lastTextBaseline, spacing: 6) {
@@ -131,7 +137,7 @@ struct NowPlayingView: View {
                                 .foregroundStyle(.white.opacity(0.7))
                         }
                         .padding(.horizontal)
-                        .padding(.bottom, 12)
+                        .padding(.bottom, 16)
 
                         // Playback controls
                         HStack(spacing: 30) {
@@ -172,7 +178,7 @@ struct NowPlayingView: View {
                             .buttonStyle(.plain)
                         }
                         .padding(.horizontal)
-                        .padding(.bottom, 12)
+                        .padding(.bottom, 16)
 
                         // Markers strip (extends to edges)
                         HorizontalMarkerStrip(
@@ -186,9 +192,16 @@ struct NowPlayingView: View {
                             },
                             onAddMarker: {
                                 showingAddMarker = true
+                            },
+                            onMarkerEdit: { marker in
+                                markerToEdit = marker
+                                showingEditMarker = true
+                            },
+                            onMarkerDelete: { marker in
+                                deleteMarker(marker)
                             }
                         )
-                        .padding(.bottom, 10)
+                        .padding(.bottom, 12)
 
                         // Buffer selector (extends to edges)
                         VStack(spacing: 6) {
@@ -199,7 +212,9 @@ struct NowPlayingView: View {
 
                             bufferSelector
                         }
-                        .padding(.bottom, 8)
+                        .padding(.bottom, 12)
+
+                        Spacer(minLength: 0)
                     }
                 } else {
                     // No song playing
@@ -211,30 +226,48 @@ struct NowPlayingView: View {
                     .padding(.horizontal)
                 }
                 }
-                .padding(.top, geometry.safeAreaInsets.top)
-                .padding(.bottom, geometry.safeAreaInsets.bottom)
             }
-        }
-        .sheet(isPresented: $showingAddMarker) {
-            if let song = musicService.currentSong {
-                AddMarkerView(
-                    currentTime: musicService.playbackTime,
-                    markedSong: getOrCreateMarkedSong(from: song)
-                )
             }
-        }
-        .sheet(isPresented: $showingEditMarker) {
-            if let marker = markerToEdit {
-                EditMarkerView(marker: marker)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Menu {
+                        Button {
+                            showingRecentlyMarked = true
+                        } label: {
+                            Label("Recently Marked", systemImage: "clock.arrow.circlepath")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .font(.title3)
+                            .foregroundStyle(.white)
+                    }
+                }
             }
-        }
-        .onChange(of: musicService.currentSong) { _, newSong in
-            updateMarkedSong(for: newSong)
-            extractColorsFromArtwork(for: newSong)
-        }
-        .onAppear {
-            updateMarkedSong(for: musicService.currentSong)
-            extractColorsFromArtwork(for: musicService.currentSong)
+            .sheet(isPresented: $showingAddMarker) {
+                if let song = musicService.currentSong {
+                    AddMarkerView(
+                        currentTime: musicService.playbackTime,
+                        markedSong: getOrCreateMarkedSong(from: song)
+                    )
+                }
+            }
+            .sheet(isPresented: $showingEditMarker) {
+                if let marker = markerToEdit {
+                    EditMarkerView(marker: marker)
+                }
+            }
+            .sheet(isPresented: $showingRecentlyMarked) {
+                RecentlyMarkedView()
+            }
+            .onChange(of: musicService.currentSong) { _, newSong in
+                updateMarkedSong(for: newSong)
+                extractColorsFromArtwork(for: newSong)
+            }
+            .onAppear {
+                updateMarkedSong(for: musicService.currentSong)
+                extractColorsFromArtwork(for: musicService.currentSong)
+            }
         }
     }
 

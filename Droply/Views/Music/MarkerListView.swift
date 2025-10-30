@@ -88,6 +88,8 @@ struct HorizontalMarkerStrip: View {
     let markers: [SongMarker]
     let onTap: (SongMarker) -> Void
     let onAddMarker: () -> Void
+    let onMarkerEdit: ((SongMarker) -> Void)?
+    let onMarkerDelete: ((SongMarker) -> Void)?
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -125,10 +127,14 @@ struct HorizontalMarkerStrip: View {
                 } else {
                     // Existing markers
                     ForEach(markers) { marker in
-                        MarkerPill(marker: marker)
-                            .onTapGesture {
-                                onTap(marker)
-                            }
+                        MarkerPill(
+                            marker: marker,
+                            onEdit: onMarkerEdit,
+                            onDelete: onMarkerDelete
+                        )
+                        .onTapGesture {
+                            onTap(marker)
+                        }
                     }
                 }
             }
@@ -139,6 +145,8 @@ struct HorizontalMarkerStrip: View {
 
 struct MarkerPill: View {
     let marker: SongMarker
+    let onEdit: ((SongMarker) -> Void)?
+    let onDelete: ((SongMarker) -> Void)?
 
     var body: some View {
         HStack(spacing: 6) {
@@ -161,6 +169,23 @@ struct MarkerPill: View {
             Capsule()
                 .stroke(.white.opacity(0.3), lineWidth: 1)
         )
+        .contextMenu {
+            if let onEdit = onEdit {
+                Button {
+                    onEdit(marker)
+                } label: {
+                    Label("Edit", systemImage: "pencil")
+                }
+            }
+
+            if let onDelete = onDelete {
+                Button(role: .destructive) {
+                    onDelete(marker)
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
+        }
     }
 
     private func formatTime(_ time: TimeInterval) -> String {
@@ -193,7 +218,9 @@ struct MarkerPill: View {
             SongMarker(timestamp: 200, emoji: "🎹", name: "Bridge")
         ],
         onTap: { _ in },
-        onAddMarker: { }
+        onAddMarker: { },
+        onMarkerEdit: { _ in },
+        onMarkerDelete: { _ in }
     )
     .padding()
     .background(Color.black)

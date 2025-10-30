@@ -163,6 +163,7 @@ struct AddMarkerView: View {
         )
 
         marker.song = markedSong
+        markedSong.lastMarkedAt = Date()
         modelContext.insert(marker)
 
         try? modelContext.save()
