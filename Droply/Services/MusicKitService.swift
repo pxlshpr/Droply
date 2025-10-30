@@ -427,6 +427,83 @@ class MusicKitService: ObservableObject {
         await seek(to: startTime)
     }
 
+    func prepareToPlaySongInContext(_ song: Song) async throws {
+        logger.info("Preparing to play song in context: \(song.title) by \(song.artistName)")
+
+        // Try to fetch the song's album to play in context
+        do {
+            // Request the song with its albums relationship
+            let detailedSongRequest = MusicCatalogResourceRequest<Song>(matching: \.id, equalTo: song.id)
+            let detailedSongResponse = try await detailedSongRequest.response()
+
+            guard let detailedSong = detailedSongResponse.items.first else {
+                logger.warning("Could not fetch detailed song, falling back to single-song queue")
+                try await prepareToPlaySong(song)
+                return
+            }
+
+            // Try to get the first album
+            if let albums = detailedSong.albums, let firstAlbum = albums.first {
+                logger.info("Found album: \(firstAlbum.title) - fetching tracks")
+
+                // Fetch the full album with tracks
+                let albumRequest = MusicCatalogResourceRequest<Album>(matching: \.id, equalTo: firstAlbum.id)
+                let albumResponse = try await albumRequest.response()
+
+                if let fullAlbum = albumResponse.items.first, let tracks = fullAlbum.tracks {
+                    // Convert tracks to songs (tracks in MusicKit albums are Songs)
+                    let songArray = Array(tracks).compactMap { track -> Song? in
+                        // Tracks from album.tracks are actually Song objects
+                        return track as? Song
+                    }
+
+                    guard !songArray.isEmpty else {
+                        logger.warning("Could not convert album tracks to songs, falling back to single-song queue")
+                        try await prepareToPlaySong(song)
+                        return
+                    }
+
+                    logger.info("Creating queue with \(songArray.count) songs from album, starting at: \(song.title)")
+
+                    // Create queue with all album tracks, starting at the selected song
+                    player.queue = ApplicationMusicPlayer.Queue(for: songArray, startingAt: song)
+
+                    // Update current song immediately
+                    currentSong = song
+                    playbackDuration = song.duration ?? 0
+                    logger.debug("Queue set with album context")
+                    return
+                }
+            }
+
+            // If we couldn't get album tracks, fall back to single song
+            logger.warning("Could not fetch album tracks, falling back to single-song queue")
+            try await prepareToPlaySong(song)
+
+        } catch {
+            logger.error("Error fetching song context: \(error.localizedDescription), falling back to single-song queue")
+            try await prepareToPlaySong(song)
+        }
+    }
+
+    func prepareToPlaySongs(_ songs: [Song], startingAt startSong: Song? = nil) async throws {
+        guard !songs.isEmpty else {
+            logger.warning("Attempted to play empty song list")
+            throw MusicKitError.notFound
+        }
+
+        let startingSong = startSong ?? songs[0]
+        logger.info("Preparing queue with \(songs.count) songs, starting at: \(startingSong.title)")
+
+        player.queue = ApplicationMusicPlayer.Queue(for: songs, startingAt: startingSong)
+
+        // Update current song immediately
+        currentSong = startingSong
+        playbackDuration = startingSong.duration ?? 0
+
+        logger.debug("Queue set with \(songs.count) songs")
+    }
+
     // MARK: - Search
 
     func searchSongs(query: String) async throws -> [Song] {

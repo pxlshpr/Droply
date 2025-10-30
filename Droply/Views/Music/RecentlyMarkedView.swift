@@ -97,6 +97,23 @@ struct RecentlyMarkedView: View {
             .navigationTitle("Recently Marked")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        Task {
+                            await playAllSongs()
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "play.fill")
+                                .font(.caption)
+                            Text("Play All")
+                                .font(.subheadline)
+                        }
+                        .foregroundStyle(.primary)
+                    }
+                    .disabled(recentlyMarkedSongs.isEmpty)
+                }
+
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         dismiss()
@@ -153,8 +170,8 @@ struct RecentlyMarkedView: View {
                 return
             }
 
-            // Prepare the song without playing it yet
-            try await musicService.prepareToPlaySong(song)
+            // Prepare the song in its album context without playing it yet
+            try await musicService.prepareToPlaySongInContext(song)
 
             // Handle play mode
             switch playMode {
@@ -178,6 +195,66 @@ struct RecentlyMarkedView: View {
             dismiss()
         } catch {
             errorMessage = "Failed to play song: \(error.localizedDescription)"
+        }
+
+        isLoading = false
+    }
+
+    private func playAllSongs() async {
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            // Fetch all songs from MusicKit
+            var songs: [Song] = []
+
+            for markedSong in recentlyMarkedSongs {
+                let request = MusicCatalogResourceRequest<Song>(
+                    matching: \.id,
+                    equalTo: MusicItemID(markedSong.appleMusicID)
+                )
+                let response = try await request.response()
+
+                if let song = response.items.first {
+                    songs.append(song)
+                } else {
+                    errorMessage = "Could not find song '\(markedSong.title)' in Apple Music"
+                }
+            }
+
+            guard !songs.isEmpty else {
+                errorMessage = "No songs available to play"
+                isLoading = false
+                return
+            }
+
+            // Prepare the queue with all songs
+            try await musicService.prepareToPlaySongs(songs)
+
+            // Handle play mode for the first song
+            switch playMode {
+            case .startOfSong:
+                // Start at beginning of first song
+                try? await musicService.play()
+            case .cueAtFirstMarker:
+                // Seek to first marker of the first song if available, then play
+                if let firstMarker = recentlyMarkedSongs.first?.sortedMarkers.first {
+                    let startTime = max(0, firstMarker.timestamp - (firstMarker.cueTime))
+                    await musicService.seek(to: startTime)
+                }
+                try? await musicService.play()
+            }
+
+            // Update last played at for all songs
+            for markedSong in recentlyMarkedSongs {
+                markedSong.lastPlayedAt = Date()
+            }
+            try? modelContext.save()
+
+            // Dismiss the view after starting playback
+            dismiss()
+        } catch {
+            errorMessage = "Failed to play songs: \(error.localizedDescription)"
         }
 
         isLoading = false

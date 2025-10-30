@@ -25,6 +25,8 @@ struct NowPlayingView: View {
     @AppStorage("defaultCueTime") private var defaultCueTime: Double = 5.0
 
     @Query private var markedSongs: [MarkedSong]
+
+    private let cueTimeOptions: [Double] = [0, 5, 10, 15, 30, 45, 60, 90, 120]
  
     var body: some View {
         NavigationStack {
@@ -399,16 +401,16 @@ struct NowPlayingView: View {
         guard let markers = markedSong?.sortedMarkers else { return nil }
         let currentTime = musicService.playbackTime
 
-        // Find the last marker that is before the current time
-        return markers.last { $0.timestamp < currentTime }
+        // Find the last marker whose cue start time is before the current time
+        return markers.last { ($0.timestamp - defaultCueTime) < currentTime }
     }
 
     private func findNextMarker() -> SongMarker? {
         guard let markers = markedSong?.sortedMarkers else { return nil }
         let currentTime = musicService.playbackTime
 
-        // Find the first marker that is after the current time
-        return markers.first { $0.timestamp > currentTime }
+        // Find the first marker whose cue start time is after the current time
+        return markers.first { ($0.timestamp - defaultCueTime) > currentTime }
     }
 
     private func navigateToPreviousMarker() {
