@@ -436,64 +436,40 @@ class MusicKitService: ObservableObject {
         await seek(to: startTime)
     }
 
-    func prependSongToSystemQueue(_ song: Song) async throws {
-        logger.info("Prepending song to system queue: \(song.title) by \(song.artistName)")
+    func playSongWithQueueManager(_ song: Song) async throws {
+        logger.info("Playing song with queue manager: \(song.title) by \(song.artistName)")
 
-        // Convert MusicKit Song to store ID
-        let storeID = song.id.rawValue
-
-        // Create queue descriptor
-        let queueDescriptor = MPMusicPlayerStoreQueueDescriptor(storeIDs: [storeID])
-
-        // Prepend to system player queue (adds to beginning)
-        systemPlayer.prepend(queueDescriptor)
-        logger.debug("Prepended song to system queue")
-
-        // Skip to beginning (where we just added the song)
-        systemPlayer.skipToBeginning()
-        logger.debug("Skipped to beginning of queue")
-
-        // Start playing
-        systemPlayer.play()
-        logger.info("System player started playing prepended song")
+        // Convert to ItemToPlay and use queue manager
+        let item = ItemToPlay(song: song)
+        try await AppleMusicQueueManager.shared.play(item)
 
         // Update current song immediately for UI responsiveness
         currentSong = song
         playbackDuration = song.duration ?? 0
         isPlaying = true
+
+        logger.info("Queue manager started playing song")
     }
 
-    func prependSongsToSystemQueue(_ songs: [Song]) async throws {
+    func playSongsWithQueueManager(_ songs: [Song]) async throws {
         guard !songs.isEmpty else {
-            logger.warning("Attempted to prepend empty song list")
+            logger.warning("Attempted to play empty song list")
             throw MusicKitError.notFound
         }
 
-        logger.info("Prepending \(songs.count) songs to system queue")
+        logger.info("Playing \(songs.count) songs with queue manager")
 
-        // Convert MusicKit Songs to store IDs
-        let storeIDs = songs.map { $0.id.rawValue }
-
-        // Create queue descriptor
-        let queueDescriptor = MPMusicPlayerStoreQueueDescriptor(storeIDs: storeIDs)
-
-        // Prepend to system player queue (adds to beginning)
-        systemPlayer.prepend(queueDescriptor)
-        logger.debug("Prepended \(songs.count) songs to system queue")
-
-        // Skip to beginning (where we just added the songs)
-        systemPlayer.skipToBeginning()
-        logger.debug("Skipped to beginning of queue")
-
-        // Start playing
-        systemPlayer.play()
-        logger.info("System player started playing prepended songs")
+        // Convert to ItemToPlay array and use queue manager
+        let items = songs.map { ItemToPlay(song: $0) }
+        try await AppleMusicQueueManager.shared.play(items)
 
         // Update current song immediately for UI responsiveness (first song in list)
         let firstSong = songs[0]
         currentSong = firstSong
         playbackDuration = firstSong.duration ?? 0
         isPlaying = true
+
+        logger.info("Queue manager started playing songs")
     }
 
     // MARK: - Search

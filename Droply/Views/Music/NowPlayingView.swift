@@ -26,6 +26,10 @@ struct NowPlayingView: View {
     @AppStorage("defaultCueTime") private var defaultCueTime: Double = 5.0
     @AppStorage("cueVisualizationMode") private var visualizationMode: String = CueVisualizationMode.button.rawValue
 
+    // Preview state
+    @State private var previewCurrentTime: TimeInterval = 75.0
+    @State private var previewIsPlaying: Bool = true
+
     @Query private var markedSongs: [MarkedSong]
 
     private let cueTimeOptions: [Double] = [0, 5, 10, 15, 30, 45, 60, 90, 120]
@@ -33,14 +37,28 @@ struct NowPlayingView: View {
     private var currentVisualizationMode: CueVisualizationMode {
         CueVisualizationMode(rawValue: visualizationMode) ?? .button
     }
- 
+
+    // Detect if running in simulator or preview
+    private var isPreview: Bool {
+        #if targetEnvironment(simulator)
+        return musicService.currentSong == nil && !markedSongs.isEmpty
+        #else
+        return false
+        #endif
+    }
+
+    // Preview dummy data
+    private var previewSongTitle: String { "Bohemian Rhapsody" }
+    private var previewArtist: String { "Queen" }
+    private var previewDuration: TimeInterval { 354.0 }
+
     var body: some View {
         NavigationStack {
             GeometryReader { geometry in
                 ZStack {
                     // Dynamic background gradient from artwork colors
                     LinearGradient(
-                        colors: [backgroundColor1, backgroundColor2],
+                        colors: isPreview ? [Color(white: 0.1), Color(white: 0.15)] : [backgroundColor1, backgroundColor2],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
@@ -49,7 +67,7 @@ struct NowPlayingView: View {
                     .animation(.easeInOut(duration: 0.8), value: backgroundColor2)
 
                 VStack(spacing: 0) {
-                if musicService.isCheckingPlayback {
+                if musicService.isCheckingPlayback && !isPreview {
                     // Checking for playback
                     VStack(spacing: 16) {
                         ProgressView()
@@ -62,7 +80,7 @@ struct NowPlayingView: View {
                             .foregroundStyle(.white.opacity(0.8))
                     }
                     .padding(.horizontal)
-                } else if let song = musicService.currentSong {
+                } else if let song = musicService.currentSong, !isPreview {
                     // Calculate available space accounting for safe areas
                     let bottomSafeArea = max(geometry.safeAreaInsets.bottom, 20) // Minimum 20pt padding
                     let availableHeight = geometry.size.height - bottomSafeArea
@@ -320,6 +338,191 @@ struct NowPlayingView: View {
                     }
                     .frame(maxWidth: availableWidth, alignment: .center)
                     .padding(.bottom, bottomSafeArea + 8)
+                } else if isPreview {
+                    // Preview mode with dummy data
+                    let bottomSafeArea = max(geometry.safeAreaInsets.bottom, 20)
+                    let availableHeight = geometry.size.height - bottomSafeArea
+                    let availableWidth = geometry.size.width
+
+                    let maxArtworkFromWidth = availableWidth - 32
+                    let maxArtworkFromHeight = availableHeight * 0.45
+                    let artworkSize = min(maxArtworkFromWidth, maxArtworkFromHeight)
+
+                    let timelineHeight: CGFloat = 40
+                    let timeFontSize: CGFloat = 40
+
+                    let horizontalPadding: CGFloat = 48
+                    let spacing: CGFloat = 20
+                    let totalSpacing = spacing * 4
+                    let availableForButtons = availableWidth - horizontalPadding - totalSpacing
+                    let markerButtonUnit = availableForButtons / (2 * 0.45 + 2 * 0.67 + 1.0)
+
+                    let controlButtonSize: CGFloat = min(48, markerButtonUnit * 0.67)
+                    let playButtonSize: CGFloat = min(60, markerButtonUnit * 1.0)
+
+                    VStack(spacing: 0) {
+                        // Album artwork (black square for preview)
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.black)
+                            .frame(width: artworkSize, height: artworkSize)
+                            .shadow(radius: 10)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 16)
+
+                        // Song info
+                        VStack(spacing: 2) {
+                            Text(previewSongTitle)
+                                .font(.title3)
+                                .fontWeight(.bold)
+                                .multilineTextAlignment(.center)
+                                .foregroundStyle(.white)
+                                .lineLimit(1)
+
+                            Text(previewArtist)
+                                .font(.subheadline)
+                                .foregroundStyle(.white.opacity(0.8))
+                                .lineLimit(1)
+                        }
+                        .padding(.horizontal)
+                        .padding(.bottom, 16)
+
+                        // Marker timeline
+                        if let previewMarkedSong = markedSongs.first {
+                            MarkerTimelineView(
+                                currentTime: previewCurrentTime,
+                                duration: previewDuration,
+                                markers: previewMarkedSong.sortedMarkers,
+                                musicService: musicService,
+                                onMarkerTap: { _ in },
+                                onMarkerEdit: { marker in
+                                    markerToEdit = marker
+                                    showingEditMarker = true
+                                },
+                                onMarkerDelete: { marker in
+                                    deleteMarker(marker)
+                                }
+                            )
+                            .frame(height: timelineHeight)
+                            .padding(.horizontal, 24)
+                            .padding(.bottom, 8)
+                        }
+
+                        // Time labels
+                        HStack(alignment: .lastTextBaseline, spacing: 6) {
+                            Button {
+                                showingAddMarker = true
+                            } label: {
+                                Text(formatTime(previewCurrentTime))
+                                    .font(.system(size: timeFontSize, weight: .bold, design: .rounded))
+                                    .monospacedDigit()
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 8)
+                            }
+                            .buttonStyle(.glassProminent)
+
+                            Text("/")
+                                .font(.system(size: timeFontSize * 0.5, weight: .medium, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.5))
+
+                            Text(formatTime(previewDuration))
+                                .font(.system(size: timeFontSize * 0.5, weight: .medium, design: .rounded))
+                                .monospacedDigit()
+                                .foregroundStyle(.white.opacity(0.7))
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 24)
+
+                        // Playback controls
+                        HStack(spacing: 0) {
+                            Button { } label: {
+                                Image(systemName: "chevron.backward.2")
+                                    .font(.system(size: controlButtonSize * 0.45))
+                                    .foregroundStyle(.white.opacity(0.8))
+                            }
+                            .buttonStyle(.plain)
+                            .frame(width: controlButtonSize)
+
+                            Spacer()
+
+                            Button { } label: {
+                                Image(systemName: "backward.fill")
+                                    .font(.system(size: controlButtonSize * 0.67))
+                                    .foregroundStyle(.white)
+                            }
+                            .buttonStyle(.plain)
+                            .frame(width: controlButtonSize)
+
+                            Spacer()
+
+                            Button { previewIsPlaying.toggle() } label: {
+                                Image(systemName: previewIsPlaying ? "pause.circle.fill" : "play.circle.fill")
+                                    .font(.system(size: playButtonSize))
+                                    .foregroundStyle(.white)
+                            }
+                            .buttonStyle(.plain)
+                            .frame(width: playButtonSize)
+
+                            Spacer()
+
+                            Button { } label: {
+                                Image(systemName: "forward.fill")
+                                    .font(.system(size: controlButtonSize * 0.67))
+                                    .foregroundStyle(.white)
+                            }
+                            .buttonStyle(.plain)
+                            .frame(width: controlButtonSize)
+
+                            Spacer()
+
+                            Button { } label: {
+                                Image(systemName: "chevron.forward.2")
+                                    .font(.system(size: controlButtonSize * 0.45))
+                                    .foregroundStyle(.white.opacity(0.8))
+                            }
+                            .buttonStyle(.plain)
+                            .frame(width: controlButtonSize)
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 32)
+
+                        Spacer()
+
+                        // Markers strip
+                        if let previewMarkedSong = markedSongs.first {
+                            if currentVisualizationMode == .marker {
+                                HorizontalMarkerStripWithAutoScroll(
+                                    markers: previewMarkedSong.sortedMarkers,
+                                    activeMarker: nil,
+                                    progress: 0,
+                                    onTap: { _ in },
+                                    onMarkerEdit: { marker in
+                                        markerToEdit = marker
+                                        showingEditMarker = true
+                                    },
+                                    onMarkerDelete: { marker in
+                                        deleteMarker(marker)
+                                    }
+                                )
+                                .frame(maxWidth: availableWidth)
+                            } else {
+                                HorizontalMarkerStrip(
+                                    markers: previewMarkedSong.sortedMarkers,
+                                    onTap: { _ in },
+                                    onMarkerEdit: { marker in
+                                        markerToEdit = marker
+                                        showingEditMarker = true
+                                    },
+                                    onMarkerDelete: { marker in
+                                        deleteMarker(marker)
+                                    }
+                                )
+                                .frame(maxWidth: availableWidth)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: availableWidth, alignment: .center)
+                    .padding(.bottom, bottomSafeArea + 8)
                 } else {
                     // No song playing
                     ContentUnavailableView(
@@ -347,11 +550,11 @@ struct NowPlayingView: View {
                         )
                         .padding(.horizontal, 16)
                         .padding(.bottom, 8)
-                        .background(
-                            Rectangle()
-                                .fill(.ultraThinMaterial)
-                                .ignoresSafeArea(edges: .bottom)
-                        )
+//                        .background(
+//                            Rectangle()
+//                                .fill(.ultraThinMaterial)
+//                                .ignoresSafeArea(edges: .bottom)
+//                        )
                     }
                 }
             }
@@ -726,262 +929,8 @@ private func createPreviewContainer() -> ModelContainer {
     }
 }
 
-struct NowPlayingViewPreview: View {
-    let container: ModelContainer
-    @State private var currentTime: TimeInterval = 75.0
-    @State private var duration: TimeInterval = 354.0
-    @State private var isPlaying: Bool = true
-    @State private var backgroundColor1: Color = Color(white: 0.1)
-    @State private var backgroundColor2: Color = Color(white: 0.15)
-    @AppStorage("defaultCueTime") private var defaultCueTime: Double = 5.0
-
-    @Query private var markedSongs: [MarkedSong]
-
-    private let cueTimeOptions: [Double] = [0, 5, 10, 15, 30, 45, 60, 90, 120]
-
-    var markedSong: MarkedSong? {
-        markedSongs.first
-    }
-
-    var body: some View {
-        NavigationStack {
-            GeometryReader { geometry in
-                ZStack {
-                    LinearGradient(
-                        colors: [backgroundColor1, backgroundColor2],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .ignoresSafeArea()
-
-                    VStack(spacing: 0) {
-                        let bottomSafeArea = max(geometry.safeAreaInsets.bottom, 20)
-                        let availableHeight = geometry.size.height - bottomSafeArea
-                        let availableWidth = geometry.size.width
-
-                        let maxArtworkFromWidth = availableWidth - 32
-                        let maxArtworkFromHeight = availableHeight * 0.45
-                        let artworkSize = min(maxArtworkFromWidth, maxArtworkFromHeight)
-
-                        let timelineHeight: CGFloat = 40
-                        let timeFontSize: CGFloat = 40
-
-                        let horizontalPadding: CGFloat = 48
-                        let spacing: CGFloat = 20
-                        let totalSpacing = spacing * 4
-                        let availableForButtons = availableWidth - horizontalPadding - totalSpacing
-                        let markerButtonUnit = availableForButtons / (2 * 0.45 + 2 * 0.67 + 1.0)
-                        let controlButtonSize: CGFloat = min(48, markerButtonUnit * 0.67)
-                        let playButtonSize: CGFloat = min(60, markerButtonUnit * 1.0)
-
-                        VStack(spacing: 0) {
-                            // Album artwork (black square)
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.black)
-                                .frame(width: artworkSize, height: artworkSize)
-                                .shadow(radius: 10)
-                                .padding(.horizontal, 16)
-                                .padding(.bottom, 16)
-
-                            // Song info
-                            VStack(spacing: 2) {
-                                Text("Bohemian Rhapsody")
-                                    .font(.title3)
-                                    .fontWeight(.bold)
-                                    .multilineTextAlignment(.center)
-                                    .foregroundStyle(.white)
-                                    .lineLimit(1)
-
-                                Text("Queen")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.white.opacity(0.8))
-                                    .lineLimit(1)
-                            }
-                            .padding(.horizontal)
-                            .padding(.bottom, 16)
-
-                            // Marker timeline
-                            if let markedSong {
-                                MarkerTimelineView(
-                                    currentTime: currentTime,
-                                    duration: duration,
-                                    markers: markedSong.sortedMarkers,
-                                    musicService: MusicKitService.shared,
-                                    onMarkerTap: { _ in },
-                                    onMarkerEdit: { _ in },
-                                    onMarkerDelete: { _ in }
-                                )
-                                .frame(height: timelineHeight)
-                                .padding(.horizontal, 24)
-                                .padding(.bottom, 8)
-                            }
-
-                            // Time labels
-                            HStack(alignment: .lastTextBaseline, spacing: 6) {
-                                // Current time - tap to add marker
-                                Button {
-                                    // Preview button action
-                                } label: {
-                                    Text(formatTime(currentTime))
-                                        .font(.system(size: timeFontSize, weight: .bold, design: .rounded))
-                                        .monospacedDigit()
-                                        .foregroundStyle(.white)
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 8)
-                                }
-                                .buttonStyle(.glassProminent)
-
-                                Text("/")
-                                    .font(.system(size: timeFontSize * 0.5, weight: .medium, design: .rounded))
-                                    .foregroundStyle(.white.opacity(0.5))
-
-                                Text(formatTime(duration))
-                                    .font(.system(size: timeFontSize * 0.5, weight: .medium, design: .rounded))
-                                    .monospacedDigit()
-                                    .foregroundStyle(.white.opacity(0.7))
-                            }
-                            .padding(.horizontal, 24)
-                            .padding(.bottom, 24)
-
-                            // Playback controls
-                            HStack(spacing: 0) {
-                                Button { } label: {
-                                    Image(systemName: "chevron.backward.2")
-                                        .font(.system(size: controlButtonSize * 0.45))
-                                        .foregroundStyle(.white.opacity(0.8))
-                                }
-                                .frame(width: controlButtonSize)
-
-                                Spacer()
-
-                                Button { } label: {
-                                    Image(systemName: "backward.fill")
-                                        .font(.system(size: controlButtonSize * 0.67))
-                                        .foregroundStyle(.white)
-                                }
-                                .frame(width: controlButtonSize)
-
-                                Spacer()
-
-                                Button { isPlaying.toggle() } label: {
-                                    Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                                        .font(.system(size: playButtonSize))
-                                        .foregroundStyle(.white)
-                                }
-                                .frame(width: playButtonSize)
-
-                                Spacer()
-
-                                Button { } label: {
-                                    Image(systemName: "forward.fill")
-                                        .font(.system(size: controlButtonSize * 0.67))
-                                        .foregroundStyle(.white)
-                                }
-                                .frame(width: controlButtonSize)
-
-                                Spacer()
-
-                                Button { } label: {
-                                    Image(systemName: "chevron.forward.2")
-                                        .font(.system(size: controlButtonSize * 0.45))
-                                        .foregroundStyle(.white.opacity(0.8))
-                                }
-                                .frame(width: controlButtonSize)
-                            }
-                            .padding(.horizontal, 24)
-                            .padding(.bottom, 32)
-
-                            Spacer()
-
-                            // Markers strip
-                            if let markedSong {
-                                HorizontalMarkerStrip(
-                                    markers: markedSong.sortedMarkers,
-                                    onTap: { _ in },
-                                    onMarkerEdit: { _ in },
-                                    onMarkerDelete: { _ in }
-                                )
-                                .frame(maxWidth: availableWidth)
-                            }
-                        }
-                        .frame(maxWidth: availableWidth, alignment: .center)
-                        .padding(.bottom, bottomSafeArea + 8)
-                    }
-                }
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Menu {
-                        Button { } label: {
-                            Label("Recently Marked", systemImage: "clock.arrow.circlepath")
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                            .font(.title3)
-                            .foregroundStyle(.white)
-                    }
-                }
-
-                ToolbarItem(placement: .bottomBar) {
-                    Button {
-                        // Preview button action
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "timer")
-                            Text(formatCueTime(defaultCueTime))
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-            .toolbarBackground(.visible, for: .bottomBar)
-        }
-    }
-
-    private func formatTime(_ time: TimeInterval) -> String {
-        let minutes = Int(time) / 60
-        let seconds = Int(time) % 60
-        return String(format: "%d:%02d", minutes, seconds)
-    }
-
-    private func formatCueTime(_ seconds: Double) -> String {
-        if seconds == 0 {
-            return "0s"
-        } else if seconds < 60 {
-            return "\(Int(seconds))s"
-        } else {
-            let minutes = Int(seconds / 60)
-            return "\(minutes)m"
-        }
-    }
-}
-
-#Preview("With Markers") {
+#Preview("Now Playing") {
     let container = createPreviewContainer()
-    return NowPlayingViewPreview(container: container)
+    return NowPlayingView()
         .modelContainer(container)
-}
-
-#Preview("iPhone SE") {
-    let container = createPreviewContainer()
-    return NowPlayingViewPreview(container: container)
-        .modelContainer(container)
-        .previewDevice(PreviewDevice(rawValue: "iPhone SE (3rd generation)"))
-}
-
-#Preview("iPhone 15 Pro Max") {
-    let container = createPreviewContainer()
-    return NowPlayingViewPreview(container: container)
-        .modelContainer(container)
-        .previewDevice(PreviewDevice(rawValue: "iPhone 15 Pro Max"))
-}
-
-#Preview("Landscape") {
-    let container = createPreviewContainer()
-    return NowPlayingViewPreview(container: container)
-        .modelContainer(container)
-        .previewInterfaceOrientation(.landscapeRight)
 }

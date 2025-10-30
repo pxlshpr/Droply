@@ -170,8 +170,11 @@ struct RecentlyMarkedView: View {
                 return
             }
 
-            // Prepend the song to the system queue and start playing
-            try await musicService.prependSongToSystemQueue(song)
+            // Play the song using the queue manager
+            try await musicService.playSongWithQueueManager(song)
+
+            // Wait a moment for playback to initialize before seeking
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
 
             // Handle play mode - seek after starting playback
             switch playMode {
@@ -227,8 +230,11 @@ struct RecentlyMarkedView: View {
                 return
             }
 
-            // Prepend all songs to the system queue and start playing
-            try await musicService.prependSongsToSystemQueue(songs)
+            // Play all songs using the queue manager
+            try await musicService.playSongsWithQueueManager(songs)
+
+            // Wait a moment for playback to initialize before seeking
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
 
             // Handle play mode for the first song - seek after starting playback
             switch playMode {
