@@ -25,9 +25,7 @@ struct NowPlayingView: View {
     @AppStorage("defaultCueTime") private var defaultCueTime: Double = 5.0
 
     @Query private var markedSongs: [MarkedSong]
-
-    private let cueTimeOptions: [Double] = [0, 5, 10, 15, 30, 45, 60, 90, 120]
-
+ 
     var body: some View {
         NavigationStack {
             GeometryReader { geometry in
@@ -134,30 +132,32 @@ struct NowPlayingView: View {
                         .padding(.horizontal, 24)
                         .padding(.bottom, 8)
 
-                        // Time labels - tap to add marker
-                        Button {
-                            showingAddMarker = true
-                        } label: {
-                            HStack(alignment: .lastTextBaseline, spacing: 6) {
+                        // Time labels
+                        HStack(alignment: .lastTextBaseline, spacing: 6) {
+                            // Current time - tap to add marker
+                            Button {
+                                showingAddMarker = true
+                            } label: {
                                 Text(formatTime(musicService.playbackTime))
                                     .font(.system(size: timeFontSize, weight: .bold, design: .rounded))
                                     .monospacedDigit()
                                     .foregroundStyle(.white)
                                     .contentTransition(.numericText())
-
-                                Text("/")
-                                    .font(.system(size: timeFontSize * 0.5, weight: .medium, design: .rounded))
-                                    .foregroundStyle(.white.opacity(0.5))
-
-                                Text(formatTime(musicService.playbackDuration))
-                                    .font(.system(size: timeFontSize * 0.5, weight: .medium, design: .rounded))
-                                    .monospacedDigit()
-                                    .foregroundStyle(.white.opacity(0.7))
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 8)
                             }
-                            .padding(.horizontal, 24)
-                            .padding(.vertical, 12)
+                            .buttonStyle(.glassProminent)
+
+                            Text("/")
+                                .font(.system(size: timeFontSize * 0.5, weight: .medium, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.5))
+
+                            Text(formatTime(musicService.playbackDuration))
+                                .font(.system(size: timeFontSize * 0.5, weight: .medium, design: .rounded))
+                                .monospacedDigit()
+                                .foregroundStyle(.white.opacity(0.7))
                         }
-                        .buttonStyle(.glassProminent)
+                        .padding(.horizontal, 24)
                         .padding(.bottom, 24)
 
                         // Playback controls
@@ -703,10 +703,18 @@ struct NowPlayingViewPreview: View {
 
                             // Time labels
                             HStack(alignment: .lastTextBaseline, spacing: 6) {
-                                Text(formatTime(currentTime))
-                                    .font(.system(size: timeFontSize, weight: .bold, design: .rounded))
-                                    .monospacedDigit()
-                                    .foregroundStyle(.white)
+                                // Current time - tap to add marker
+                                Button {
+                                    // Preview button action
+                                } label: {
+                                    Text(formatTime(currentTime))
+                                        .font(.system(size: timeFontSize, weight: .bold, design: .rounded))
+                                        .monospacedDigit()
+                                        .foregroundStyle(.white)
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 8)
+                                }
+                                .buttonStyle(.glassProminent)
 
                                 Text("/")
                                     .font(.system(size: timeFontSize * 0.5, weight: .medium, design: .rounded))
