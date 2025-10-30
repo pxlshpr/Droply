@@ -23,6 +23,7 @@ class MusicKitService: ObservableObject {
     @Published var playbackTime: TimeInterval = 0
     @Published var playbackDuration: TimeInterval = 0
     @Published var isDragging: Bool = false
+    @Published var isCheckingPlayback: Bool = true
 
     private let player = ApplicationMusicPlayer.shared
     private let systemPlayer = MPMusicPlayerController.systemMusicPlayer
@@ -113,7 +114,9 @@ class MusicKitService: ObservableObject {
             .store(in: &cancellables)
 
         // Initial update from system player
-        updateSystemPlayerState()
+        Task {
+            await performInitialPlaybackCheck()
+        }
 
         // Start timer for continuous playback time updates
         startPlaybackTimer()
@@ -126,6 +129,32 @@ class MusicKitService: ObservableObject {
                 self?.updatePlaybackTime()
             }
         }
+    }
+
+    private func performInitialPlaybackCheck() async {
+        logger.debug("Performing initial playback check")
+
+        // Update playback state
+        let playbackState = systemPlayer.playbackState
+        isPlaying = playbackState == .playing
+        logger.debug("System player playback state: \(String(describing: playbackState))")
+
+        // Get current media item
+        guard let mediaItem = systemPlayer.nowPlayingItem else {
+            logger.warning("System player has no now playing item on startup")
+            currentSong = nil
+            isCheckingPlayback = false
+            return
+        }
+
+        logger.info("System player now playing on startup: \(mediaItem.title ?? "Unknown") by \(mediaItem.artist ?? "Unknown")")
+
+        // Try to convert MPMediaItem to MusicKit Song
+        await convertMediaItemToSong(mediaItem)
+
+        // Mark check as complete
+        isCheckingPlayback = false
+        logger.debug("Initial playback check completed")
     }
 
     private func updateSystemPlayerState() {

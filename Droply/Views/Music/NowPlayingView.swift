@@ -36,7 +36,19 @@ struct NowPlayingView: View {
             .animation(.easeInOut(duration: 0.8), value: backgroundColor2)
 
             VStack(spacing: 0) {
-                    if let song = musicService.currentSong {
+                    if musicService.isCheckingPlayback {
+                        // Checking for playback
+                        VStack(spacing: 16) {
+                            ProgressView()
+                                .progressViewStyle(.circular)
+                                .tint(.white)
+                                .scaleEffect(1.2)
+
+                            Text("Checking for playback...")
+                                .font(.subheadline)
+                                .foregroundStyle(.white.opacity(0.8))
+                        }
+                    } else if let song = musicService.currentSong {
                         Spacer()
 
                         // Album artwork
