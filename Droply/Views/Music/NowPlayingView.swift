@@ -183,8 +183,15 @@ struct NowPlayingView: View {
                                     .contentTransition(.numericText())
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 8)
+                                    .background(
+                                        LinearGradient(
+                                            colors: [backgroundColor2, backgroundColor1],
+                                            startPoint: .bottomTrailing,
+                                            endPoint: .topLeading
+                                        )
+                                    )
+                                    .cornerRadius(12)
                             }
-                            .buttonStyle(.glassProminent)
 
                             Text("/")
                                 .font(.system(size: timeFontSize * 0.5, weight: .medium, design: .rounded))
@@ -432,8 +439,15 @@ struct NowPlayingView: View {
                                     .foregroundStyle(.white)
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 8)
+                                    .background(
+                                        LinearGradient(
+                                            colors: [backgroundColor2, backgroundColor1],
+                                            startPoint: .bottomTrailing,
+                                            endPoint: .topLeading
+                                        )
+                                    )
+                                    .cornerRadius(12)
                             }
-                            .buttonStyle(.glassProminent)
 
                             Text("/")
                                 .font(.system(size: timeFontSize * 0.5, weight: .medium, design: .rounded))

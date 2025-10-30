@@ -35,7 +35,7 @@ struct CueButtonVisualization: View {
                 }
                 .foregroundStyle(.white)
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 12)
             .padding(.vertical, 12)
             .background(
                 GeometryReader { geometry in
