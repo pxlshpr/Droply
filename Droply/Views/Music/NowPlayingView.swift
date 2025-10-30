@@ -24,55 +24,56 @@ struct NowPlayingView: View {
     private let bufferOptions: [Double] = [0, 5, 10, 15, 30, 45, 60, 90, 120]
 
     var body: some View {
-        ZStack {
-            // Dynamic background gradient from artwork colors
-            LinearGradient(
-                colors: [backgroundColor1, backgroundColor2],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
-            .animation(.easeInOut(duration: 0.8), value: backgroundColor1)
-            .animation(.easeInOut(duration: 0.8), value: backgroundColor2)
+        GeometryReader { geometry in
+            ZStack {
+                // Dynamic background gradient from artwork colors
+                LinearGradient(
+                    colors: [backgroundColor1, backgroundColor2],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+                .animation(.easeInOut(duration: 0.8), value: backgroundColor1)
+                .animation(.easeInOut(duration: 0.8), value: backgroundColor2)
 
-            VStack(spacing: 0) {
-                    if musicService.isCheckingPlayback {
-                        // Checking for playback
-                        VStack(spacing: 16) {
-                            ProgressView()
-                                .progressViewStyle(.circular)
-                                .tint(.white)
-                                .scaleEffect(1.2)
+                VStack(spacing: 0) {
+                if musicService.isCheckingPlayback {
+                    // Checking for playback
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .progressViewStyle(.circular)
+                            .tint(.white)
+                            .scaleEffect(1.2)
 
-                            Text("Checking for playback...")
-                                .font(.subheadline)
-                                .foregroundStyle(.white.opacity(0.8))
-                        }
-                    } else if let song = musicService.currentSong {
-                        // Album artwork
-                        albumArtwork(for: song)
-                            .padding(.top, 8)
-                            .padding(.bottom, 16)
-
-                        // Song info
-                        VStack(spacing: 4) {
-                            Text(song.title)
-                                .font(.title3)
-                                .fontWeight(.bold)
-                                .multilineTextAlignment(.center)
-                                .foregroundStyle(.white)
-                                .lineLimit(1)
-
-                            Text(song.artistName)
-                                .font(.subheadline)
-                                .foregroundStyle(.white.opacity(0.8))
-                                .lineLimit(1)
-                        }
-                        .padding(.horizontal)
+                        Text("Checking for playback...")
+                            .font(.subheadline)
+                            .foregroundStyle(.white.opacity(0.8))
+                    }
+                } else if let song = musicService.currentSong {
+                    // Album artwork
+                    albumArtwork(for: song)
+                        .padding(.top, 8)
                         .padding(.bottom, 16)
 
-                        // Marker timeline
-                        MarkerTimelineView(
+                    // Song info
+                    VStack(spacing: 4) {
+                        Text(song.title)
+                            .font(.title3)
+                            .fontWeight(.bold)
+                            .multilineTextAlignment(.center)
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+
+                        Text(song.artistName)
+                            .font(.subheadline)
+                            .foregroundStyle(.white.opacity(0.8))
+                            .lineLimit(1)
+                    }
+                    .padding(.horizontal)
+                    .padding(.bottom, 16)
+
+                    // Marker timeline
+                    MarkerTimelineView(
                             currentTime: musicService.playbackTime,
                             duration: musicService.playbackDuration,
                             markers: markedSong?.sortedMarkers ?? [],
@@ -170,19 +171,22 @@ struct NowPlayingView: View {
                         }
                         .padding(.bottom, 12)
 
-                        Spacer()
-                    } else {
-                        // No song playing
-                        ContentUnavailableView(
-                            "No Song Playing",
-                            systemImage: "music.note",
-                            description: Text("Play a song from Apple Music to get started")
-                        )
-                    }
+                    Spacer()
+                } else {
+                    // No song playing
+                    ContentUnavailableView(
+                        "No Song Playing",
+                        systemImage: "music.note",
+                        description: Text("Play a song from Apple Music to get started")
+                    )
                 }
-                .padding()
+                }
+                .padding(.top, geometry.safeAreaInsets.top)
+                .padding(.bottom, geometry.safeAreaInsets.bottom)
+                .padding(.horizontal)
             }
-            .sheet(isPresented: $showingAddMarker) {
+        }
+        .sheet(isPresented: $showingAddMarker) {
                 if let song = musicService.currentSong {
                     AddMarkerView(
                         currentTime: musicService.playbackTime,
