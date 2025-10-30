@@ -228,6 +228,8 @@ struct NowPlayingView: View {
                         .padding(.horizontal, 24)
                         .padding(.bottom, 32)
 
+                        Spacer()
+
                         // Markers strip
                         HorizontalMarkerStrip(
                             markers: markedSong?.sortedMarkers ?? [],
@@ -249,7 +251,6 @@ struct NowPlayingView: View {
                                 deleteMarker(marker)
                             }
                         )
-                        .padding(.bottom, 20)
                         .frame(maxWidth: availableWidth)
                     }
                     .frame(maxWidth: availableWidth, alignment: .center)
@@ -369,6 +370,7 @@ struct NowPlayingView: View {
                 ForEach(cueTimeOptions, id: \.self) { cueTime in
                     Button {
                         defaultCueTime = cueTime
+                        showingCueTimeSelector = false
                     } label: {
                         Text(formatCueTime(cueTime))
                             .font(.subheadline)
@@ -763,6 +765,8 @@ struct NowPlayingViewPreview: View {
                             .padding(.horizontal, 24)
                             .padding(.bottom, 32)
 
+                            Spacer()
+
                             // Markers strip
                             if let markedSong {
                                 HorizontalMarkerStrip(
@@ -772,7 +776,6 @@ struct NowPlayingViewPreview: View {
                                     onMarkerEdit: { _ in },
                                     onMarkerDelete: { _ in }
                                 )
-                                .padding(.bottom, 20)
                                 .frame(maxWidth: availableWidth)
                             }
                         }
