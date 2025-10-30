@@ -16,6 +16,7 @@ struct NowPlayingView: View {
     @State private var showingAddMarker = false
     @State private var showingEditMarker = false
     @State private var showingRecentlyMarked = false
+    @State private var showingCueTimeSelector = false
     @State private var recentlyMarkedDetent: PresentationDetent = .medium
     @State private var markerToEdit: SongMarker?
     @State private var selectedMarker: SongMarker?
@@ -66,7 +67,7 @@ struct NowPlayingView: View {
                     let maxArtworkFromHeight = availableHeight * 0.45 // Use 45% of height
                     let artworkSize = min(maxArtworkFromWidth, maxArtworkFromHeight)
 
-                    let timelineHeight: CGFloat = 80
+                    let timelineHeight: CGFloat = 40
                     let timeFontSize: CGFloat = 40
 
                     // Calculate control button sizes based on available width
@@ -131,7 +132,7 @@ struct NowPlayingView: View {
                         )
                         .frame(height: timelineHeight)
                         .padding(.horizontal, 24)
-                        .padding(.bottom, 2)
+                        .padding(.bottom, 8)
 
                         // Time labels
                         HStack(alignment: .lastTextBaseline, spacing: 6) {
@@ -225,7 +226,7 @@ struct NowPlayingView: View {
                             .frame(width: controlButtonSize)
                         }
                         .padding(.horizontal, 24)
-                        .padding(.bottom, 24)
+                        .padding(.bottom, 32)
 
                         // Markers strip
                         HorizontalMarkerStrip(
@@ -248,20 +249,8 @@ struct NowPlayingView: View {
                                 deleteMarker(marker)
                             }
                         )
-                        .padding(.bottom, 12)
+                        .padding(.bottom, 20)
                         .frame(maxWidth: availableWidth)
-
-                        // Cue time selector
-                        VStack(spacing: 6) {
-                            Text("Cue Time")
-                                .font(.caption)
-                                .foregroundStyle(.white.opacity(0.7))
-                                .padding(.horizontal)
-
-                            cueTimeSelector
-                                .frame(maxWidth: availableWidth)
-                        }
-                        .padding(.bottom, 8)
                     }
                     .frame(maxWidth: availableWidth, alignment: .center)
                     .padding(.bottom, bottomSafeArea + 8)
@@ -292,7 +281,21 @@ struct NowPlayingView: View {
                             .foregroundStyle(.white)
                     }
                 }
+
+                ToolbarItem(placement: .bottomBar) {
+                    Button {
+                        showingCueTimeSelector = true
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "timer")
+                            Text(formatCueTime(defaultCueTime))
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                        }
+                    }
+                }
             }
+            .toolbarBackground(.visible, for: .bottomBar)
             .sheet(isPresented: $showingAddMarker) {
                 if let song = musicService.currentSong {
                     AddMarkerView(
@@ -311,6 +314,20 @@ struct NowPlayingView: View {
                     .presentationDetents([.medium, .large], selection: $recentlyMarkedDetent)
                     .presentationBackgroundInteraction(.enabled(upThrough: .medium))
                     .presentationBackground(.ultraThinMaterial)
+            }
+            .sheet(isPresented: $showingCueTimeSelector) {
+                VStack(spacing: 16) {
+                    Text("Cue Time")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                        .padding(.top, 16)
+
+                    cueTimeSelector
+
+                    Spacer()
+                }
+                .presentationDetents([.height(160)])
+                .presentationBackground(.ultraThinMaterial)
             }
             .onChange(of: musicService.currentSong) { _, newSong in
                 updateMarkedSong(for: newSong)
@@ -593,8 +610,8 @@ struct NowPlayingViewPreview: View {
     @State private var currentTime: TimeInterval = 75.0
     @State private var duration: TimeInterval = 354.0
     @State private var isPlaying: Bool = true
-    @State private var backgroundColor1: Color = .purple.opacity(0.3)
-    @State private var backgroundColor2: Color = .blue.opacity(0.3)
+    @State private var backgroundColor1: Color = Color(white: 0.1)
+    @State private var backgroundColor2: Color = Color(white: 0.15)
     @AppStorage("defaultCueTime") private var defaultCueTime: Double = 5.0
 
     @Query private var markedSongs: [MarkedSong]
@@ -625,7 +642,7 @@ struct NowPlayingViewPreview: View {
                         let maxArtworkFromHeight = availableHeight * 0.45
                         let artworkSize = min(maxArtworkFromWidth, maxArtworkFromHeight)
 
-                        let timelineHeight: CGFloat = 80
+                        let timelineHeight: CGFloat = 40
                         let timeFontSize: CGFloat = 40
 
                         let horizontalPadding: CGFloat = 48
@@ -675,7 +692,7 @@ struct NowPlayingViewPreview: View {
                                 )
                                 .frame(height: timelineHeight)
                                 .padding(.horizontal, 24)
-                                .padding(.bottom, 2)
+                                .padding(.bottom, 8)
                             }
 
                             // Time labels
@@ -743,7 +760,7 @@ struct NowPlayingViewPreview: View {
                                 .frame(width: controlButtonSize)
                             }
                             .padding(.horizontal, 24)
-                            .padding(.bottom, 24)
+                            .padding(.bottom, 32)
 
                             // Markers strip
                             if let markedSong {
@@ -754,42 +771,9 @@ struct NowPlayingViewPreview: View {
                                     onMarkerEdit: { _ in },
                                     onMarkerDelete: { _ in }
                                 )
-                                .padding(.bottom, 12)
+                                .padding(.bottom, 20)
                                 .frame(maxWidth: availableWidth)
                             }
-
-                            // Cue time selector
-                            VStack(spacing: 6) {
-                                Text("Cue Time")
-                                    .font(.caption)
-                                    .foregroundStyle(.white.opacity(0.7))
-                                    .padding(.horizontal)
-
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: 8) {
-                                        ForEach(cueTimeOptions, id: \.self) { cueTime in
-                                            Button {
-                                                defaultCueTime = cueTime
-                                            } label: {
-                                                Text(formatCueTime(cueTime))
-                                                    .font(.subheadline)
-                                                    .fontWeight(defaultCueTime == cueTime ? .bold : .medium)
-                                                    .foregroundStyle(defaultCueTime == cueTime ? .black : .white)
-                                                    .padding(.horizontal, 16)
-                                                    .padding(.vertical, 8)
-                                                    .background(defaultCueTime == cueTime ? .white : .white.opacity(0.2))
-                                                    .cornerRadius(16)
-                                                    .scaleEffect(defaultCueTime == cueTime ? 1.05 : 1.0)
-                                                    .shadow(color: defaultCueTime == cueTime ? .white.opacity(0.3) : .clear, radius: 8)
-                                            }
-                                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: defaultCueTime)
-                                        }
-                                    }
-                                    .padding(.horizontal, 24)
-                                }
-                                .frame(maxWidth: availableWidth)
-                            }
-                            .padding(.bottom, 8)
                         }
                         .frame(maxWidth: availableWidth, alignment: .center)
                         .padding(.bottom, bottomSafeArea + 8)

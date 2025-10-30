@@ -20,7 +20,7 @@ struct MarkerTimelineView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            VStack(spacing: 12) {
+            VStack(spacing: 0) {
                 // Markers visualization
                 ZStack(alignment: .leading) {
                     // Background track
@@ -49,6 +49,7 @@ struct MarkerTimelineView: View {
                         .offset(x: progressWidth(geometry.size.width) - 8)
                 }
                 .frame(height: 40)
+                .frame(maxHeight: .infinity, alignment: .center)
                 .gesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { value in
@@ -109,15 +110,6 @@ struct MarkerTimelineView: View {
             Rectangle()
                 .fill(.white)
                 .frame(width: 2, height: 12)
-
-            if marker.cueTime > 0 {
-                // Show cue time indicator
-                let cueTimeWidth = (marker.cueTime / duration) * geometry.size.width
-                Rectangle()
-                    .fill(.white.opacity(0.3))
-                    .frame(width: cueTimeWidth, height: 4)
-                    .offset(x: -cueTimeWidth / 2)
-            }
         }
         .offset(x: position - 16)
     }
