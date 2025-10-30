@@ -131,7 +131,7 @@ struct NowPlayingView: View {
                         )
                         .frame(height: timelineHeight)
                         .padding(.horizontal, 24)
-                        .padding(.bottom, 8)
+                        .padding(.bottom, 2)
 
                         // Time labels
                         HStack(alignment: .lastTextBaseline, spacing: 6) {
@@ -154,7 +154,7 @@ struct NowPlayingView: View {
                         .padding(.bottom, 24)
 
                         // Playback controls
-                        HStack(spacing: 20) {
+                        HStack(spacing: 0) {
                             // Previous marker button
                             Button {
                                 navigateToPreviousMarker()
@@ -164,6 +164,7 @@ struct NowPlayingView: View {
                                     .foregroundStyle(.white.opacity(0.8))
                             }
                             .buttonStyle(.plain)
+                            .frame(width: controlButtonSize)
 
                             Spacer()
 
@@ -178,6 +179,7 @@ struct NowPlayingView: View {
                                     .foregroundStyle(.white)
                             }
                             .buttonStyle(.plain)
+                            .frame(width: controlButtonSize)
 
                             Spacer()
 
@@ -192,6 +194,7 @@ struct NowPlayingView: View {
                                     .foregroundStyle(.white)
                             }
                             .buttonStyle(.plain)
+                            .frame(width: playButtonSize)
 
                             Spacer()
 
@@ -206,6 +209,7 @@ struct NowPlayingView: View {
                                     .foregroundStyle(.white)
                             }
                             .buttonStyle(.plain)
+                            .frame(width: controlButtonSize)
 
                             Spacer()
 
@@ -218,6 +222,7 @@ struct NowPlayingView: View {
                                     .foregroundStyle(.white.opacity(0.8))
                             }
                             .buttonStyle(.plain)
+                            .frame(width: controlButtonSize)
                         }
                         .padding(.horizontal, 24)
                         .padding(.bottom, 24)
@@ -670,7 +675,7 @@ struct NowPlayingViewPreview: View {
                                 )
                                 .frame(height: timelineHeight)
                                 .padding(.horizontal, 24)
-                                .padding(.bottom, 8)
+                                .padding(.bottom, 2)
                             }
 
                             // Time labels
@@ -693,12 +698,13 @@ struct NowPlayingViewPreview: View {
                             .padding(.bottom, 24)
 
                             // Playback controls
-                            HStack(spacing: 20) {
+                            HStack(spacing: 0) {
                                 Button { } label: {
                                     Image(systemName: "chevron.backward.2")
                                         .font(.system(size: controlButtonSize * 0.45))
                                         .foregroundStyle(.white.opacity(0.8))
                                 }
+                                .frame(width: controlButtonSize)
 
                                 Spacer()
 
@@ -707,6 +713,7 @@ struct NowPlayingViewPreview: View {
                                         .font(.system(size: controlButtonSize * 0.67))
                                         .foregroundStyle(.white)
                                 }
+                                .frame(width: controlButtonSize)
 
                                 Spacer()
 
@@ -715,6 +722,7 @@ struct NowPlayingViewPreview: View {
                                         .font(.system(size: playButtonSize))
                                         .foregroundStyle(.white)
                                 }
+                                .frame(width: playButtonSize)
 
                                 Spacer()
 
@@ -723,6 +731,7 @@ struct NowPlayingViewPreview: View {
                                         .font(.system(size: controlButtonSize * 0.67))
                                         .foregroundStyle(.white)
                                 }
+                                .frame(width: controlButtonSize)
 
                                 Spacer()
 
@@ -731,6 +740,7 @@ struct NowPlayingViewPreview: View {
                                         .font(.system(size: controlButtonSize * 0.45))
                                         .foregroundStyle(.white.opacity(0.8))
                                 }
+                                .frame(width: controlButtonSize)
                             }
                             .padding(.horizontal, 24)
                             .padding(.bottom, 24)
