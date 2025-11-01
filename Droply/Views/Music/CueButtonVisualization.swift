@@ -13,28 +13,43 @@ struct CueButtonVisualization: View {
     let isActive: Bool
     let onTap: () -> Void
     var meshColors: [Color]? // Optional mesh gradient colors from artwork
+    var loopEnabled: Bool = false
+    var loopDuration: Double = 0
 
     @State private var shimmerOffset: CGFloat = -1
 
     var body: some View {
         Button(action: onTap) {
-            HStack {
+            HStack(spacing: 8) {
                 // Label
-                Text("Cue Time")
+                Text("Drop in")
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .foregroundStyle(.white)
 
                 Spacer()
 
-                // Value with icon
+                // Buffer time with icon
                 HStack(spacing: 4) {
                     Image(systemName: "timer")
+                        .font(.caption)
                     Text(formatCueTime(cueTime))
                         .font(.subheadline)
                         .fontWeight(.medium)
                 }
                 .foregroundStyle(.white)
+
+                // Loop indicator
+                if loopEnabled {
+                    HStack(spacing: 4) {
+                        Image(systemName: "repeat")
+                            .font(.caption)
+                        Text(formatCueTime(loopDuration))
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                    }
+                    .foregroundStyle(.white.opacity(0.8))
+                }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 12)

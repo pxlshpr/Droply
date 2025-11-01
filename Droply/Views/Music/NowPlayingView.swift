@@ -27,6 +27,8 @@ struct NowPlayingView: View {
     @State private var meshColors: [Color]? // Colors for mesh gradient visualizations
     @State private var backgroundMeshColors: [Color]? // Colors for background mesh gradient
     @AppStorage("defaultCueTime") private var defaultCueTime: Double = 5.0
+    @AppStorage("loopModeEnabled") private var loopModeEnabled: Bool = false
+    @AppStorage("loopDuration") private var loopDuration: Double = 10.0
     @Namespace private var recentlyMarkedNamespace
     @AppStorage("cueVisualizationMode") private var visualizationMode: String = CueVisualizationMode.button.rawValue
 
@@ -153,7 +155,9 @@ struct NowPlayingView: View {
                                     cueManager.startCue(
                                         for: marker,
                                         defaultCueTime: defaultCueTime,
-                                        currentTime: startTime
+                                        currentTime: startTime,
+                                        loopEnabled: loopModeEnabled,
+                                        loopDuration: loopDuration
                                     )
 
                                     // Show fullscreen if that mode is selected
@@ -294,7 +298,9 @@ struct NowPlayingView: View {
                                         cueManager.startCue(
                                             for: marker,
                                             defaultCueTime: defaultCueTime,
-                                            currentTime: startTime
+                                            currentTime: startTime,
+                                            loopEnabled: loopModeEnabled,
+                                            loopDuration: loopDuration
                                         )
                                     }
                                 },
@@ -321,7 +327,9 @@ struct NowPlayingView: View {
                                         cueManager.startCue(
                                             for: marker,
                                             defaultCueTime: defaultCueTime,
-                                            currentTime: startTime
+                                            currentTime: startTime,
+                                            loopEnabled: loopModeEnabled,
+                                            loopDuration: loopDuration
                                         )
 
                                         // Show fullscreen if that mode is selected
@@ -350,7 +358,9 @@ struct NowPlayingView: View {
                                 onTap: {
                                     showingCueTimeSelector = true
                                 },
-                                meshColors: meshColors
+                                meshColors: meshColors,
+                                loopEnabled: loopModeEnabled,
+                                loopDuration: loopDuration
                             )
                             .padding(.horizontal, 16)
                             .padding(.top, 8)
@@ -550,7 +560,9 @@ struct NowPlayingView: View {
                                 onTap: {
                                     showingCueTimeSelector = true
                                 },
-                                meshColors: meshColors
+                                meshColors: meshColors,
+                                loopEnabled: loopModeEnabled,
+                                loopDuration: loopDuration
                             )
                             .padding(.horizontal, 16)
                             .padding(.top, 8)
@@ -640,18 +652,47 @@ struct NowPlayingView: View {
                     .presentationBackground(.ultraThinMaterial)
             }
             .sheet(isPresented: $showingCueTimeSelector) {
-                VStack(spacing: 16) {
-                    Text("Cue Time")
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                        .padding(.top, 16)
+                NavigationStack {
+                    Form {
+                        Section {
+                            cueTimeSelector
+                        } header: {
+                            Text("Buffer Time")
+                        } footer: {
+                            Text("Start playing this many seconds before the marker")
+                        }
 
-                    cueTimeSelector
+                        Section {
+                            Toggle(isOn: $loopModeEnabled) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Loop Mode")
+                                    Text("Repeat the section after playing")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
 
-                    Spacer()
+                            if loopModeEnabled {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Loop Duration")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+
+                                    loopDurationSelector
+                                }
+                            }
+                        } footer: {
+                            if loopModeEnabled {
+                                Text("Play for this duration after the marker, then loop back to start")
+                            }
+                        }
+                    }
+                    .navigationTitle("Drop-in Settings")
+                    .navigationBarTitleDisplayMode(.inline)
                 }
-                .presentationDetents([.height(160)])
+                .presentationDetents([.height(loopModeEnabled ? 420 : 320)])
                 .presentationBackground(.ultraThinMaterial)
+                .animation(.spring(response: 0.3), value: loopModeEnabled)
             }
             .onChange(of: musicService.currentSong) { _, newSong in
                 updateMarkedSong(for: newSong)
@@ -706,7 +747,6 @@ struct NowPlayingView: View {
                 ForEach(cueTimeOptions, id: \.self) { cueTime in
                     Button {
                         defaultCueTime = cueTime
-                        showingCueTimeSelector = false
                     } label: {
                         Text(formatCueTime(cueTime))
                             .font(.subheadline)
@@ -720,6 +760,31 @@ struct NowPlayingView: View {
                             .shadow(color: defaultCueTime == cueTime ? .white.opacity(0.3) : .clear, radius: 8)
                     }
                     .animation(.spring(response: 0.3, dampingFraction: 0.7), value: defaultCueTime)
+                }
+            }
+            .padding(.horizontal, 24)
+        }
+    }
+
+    private var loopDurationSelector: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(cueTimeOptions, id: \.self) { duration in
+                    Button {
+                        loopDuration = duration
+                    } label: {
+                        Text(formatCueTime(duration))
+                            .font(.subheadline)
+                            .fontWeight(loopDuration == duration ? .bold : .medium)
+                            .foregroundStyle(loopDuration == duration ? .black : .white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(loopDuration == duration ? .white : .white.opacity(0.2))
+                            .cornerRadius(16)
+                            .scaleEffect(loopDuration == duration ? 1.05 : 1.0)
+                            .shadow(color: loopDuration == duration ? .white.opacity(0.3) : .clear, radius: 8)
+                    }
+                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: loopDuration)
                 }
             }
             .padding(.horizontal, 24)

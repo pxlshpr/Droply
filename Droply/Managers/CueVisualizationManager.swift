@@ -49,11 +49,17 @@ class CueVisualizationManager: ObservableObject {
         let startTime: TimeInterval
         let endTime: TimeInterval
         let duration: TimeInterval
+        let loopEnabled: Bool
+        let loopDuration: TimeInterval
 
         func progress(at currentTime: TimeInterval) -> Double {
             guard duration > 0 else { return 0 }
             let elapsed = currentTime - startTime
             return min(max(elapsed / duration, 0), 1)
+        }
+
+        var loopEndTime: TimeInterval {
+            endTime + loopDuration
         }
 
         var isActive: Bool {
@@ -74,7 +80,7 @@ class CueVisualizationManager: ObservableObject {
             .store(in: &cancellables)
     }
 
-    func startCue(for marker: SongMarker, defaultCueTime: Double, currentTime: TimeInterval) {
+    func startCue(for marker: SongMarker, defaultCueTime: Double, currentTime: TimeInterval, loopEnabled: Bool = false, loopDuration: TimeInterval = 0) {
         let startTime = max(0, marker.timestamp - defaultCueTime)
         let endTime = marker.timestamp
         let duration = defaultCueTime
@@ -83,7 +89,9 @@ class CueVisualizationManager: ObservableObject {
             marker: marker,
             startTime: startTime,
             endTime: endTime,
-            duration: duration
+            duration: duration,
+            loopEnabled: loopEnabled,
+            loopDuration: loopDuration
         )
         lastTriggeredMarker = nil
 
@@ -113,7 +121,21 @@ class CueVisualizationManager: ObservableObject {
                 lastTriggeredMarker = cue.marker
             }
 
-            // Clear the cue after passing the marker
+            // If loop mode is enabled, check if we should loop back
+            if cue.loopEnabled {
+                // Check if we've reached the loop end time
+                if currentTime >= cue.loopEndTime {
+                    // Loop back to the start time
+                    Task {
+                        await musicService?.seek(to: cue.startTime)
+                    }
+                    return
+                }
+                // Still in the loop duration, continue playing
+                return
+            }
+
+            // Clear the cue after passing the marker (non-loop mode)
             clearCue()
             return
         }

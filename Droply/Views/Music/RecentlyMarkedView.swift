@@ -103,18 +103,22 @@ struct RecentlyMarkedView: View {
                         } label: {
                             Label("Start", systemImage: playMode == .startOfSong ? "checkmark" : "")
                         }
-                        
+
                         Button {
                             playMode = .cueAtFirstMarker
                         } label: {
-                            Label("Cue at Marker", systemImage: playMode == .cueAtFirstMarker ? "checkmark" : "")
+                            Label("Drop in at Marker", systemImage: playMode == .cueAtFirstMarker ? "checkmark" : "")
                         }
                     } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "ellipsis.circle")
-                            Text(playMode == .startOfSong ? "Start" : "Cue")
+                        HStack(spacing: 6) {
+                            Image(systemName: "ellipsis")
+                                .font(.caption)
+                            Text(playMode == .startOfSong ? "Start" : "Drop in")
                                 .font(.subheadline)
                         }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
                     }
                 }
                 ToolbarSpacer(placement: .bottomBar)
