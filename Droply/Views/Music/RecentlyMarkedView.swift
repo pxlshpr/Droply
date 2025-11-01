@@ -86,15 +86,6 @@ struct RecentlyMarkedView: View {
             .navigationTitle("Recently Marked")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Picker("Play Mode", selection: $playMode) {
-                        Text("Start").tag(PlayMode.startOfSong)
-                        Text("Cue at First Marker").tag(PlayMode.cueAtFirstMarker)
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(maxWidth: 280)
-                }
-
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         dismiss()
@@ -106,6 +97,28 @@ struct RecentlyMarkedView: View {
                 }
 
                 ToolbarItem(placement: .bottomBar) {
+                    Menu {
+                        Button {
+                            playMode = .startOfSong
+                        } label: {
+                            Label("Start", systemImage: playMode == .startOfSong ? "checkmark" : "")
+                        }
+                        
+                        Button {
+                            playMode = .cueAtFirstMarker
+                        } label: {
+                            Label("Cue at Marker", systemImage: playMode == .cueAtFirstMarker ? "checkmark" : "")
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "ellipsis.circle")
+                            Text(playMode == .startOfSong ? "Start" : "Cue")
+                                .font(.subheadline)
+                        }
+                    }
+                }
+                ToolbarSpacer(placement: .bottomBar)
+                ToolbarItem(placement: .bottomBar) {
                     Button {
                         Task {
                             await playAllSongs()
@@ -116,13 +129,13 @@ struct RecentlyMarkedView: View {
                             Text("Play All")
                         }
                         .font(.headline)
-                        .frame(maxWidth: .infinity)
+                        .foregroundStyle(.white)
                     }
                     .buttonStyle(.glassProminent)
                     .disabled(recentlyMarkedSongs.isEmpty)
                 }
             }
-            .toolbarBackground(.visible, for: .bottomBar)
+//            .toolbarBackground(.visible, for: .bottomBar)
             .overlay {
                 if isLoading {
                     ZStack {
@@ -359,13 +372,13 @@ struct RecentlyMarkedRow: View {
             Spacer(minLength: 8)
 
             // Marker timeline visualization
-            MarkerTimelineView(song: song)
+            SongMarkerPreview(song: song)
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 0)
     }
 }
 
-struct MarkerTimelineView: View {
+struct SongMarkerPreview: View {
     let song: MarkedSong
     private let timelineWidth: CGFloat = 80
     private let timelineHeight: CGFloat = 2
@@ -384,7 +397,7 @@ struct MarkerTimelineView: View {
 
                 Text(marker.emoji)
                     .font(.system(size: 8))
-                    .offset(x: position, y: 0)
+                    .offset(x: position, y: -6)
             }
         }
         .frame(width: timelineWidth, height: 16)

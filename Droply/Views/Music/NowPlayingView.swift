@@ -752,9 +752,31 @@ struct NowPlayingView: View {
                 try? await musicService.play()
             }
         } else {
-            // No previous marker found - error haptic
-            let generator = UINotificationFeedbackGenerator()
-            generator.notificationOccurred(.error)
+            // No previous marker found in current song - try to skip to previous song
+            Task {
+                do {
+                    // Try to skip to the previous song in the queue
+                    try await musicService.skipToPreviousItem()
+
+                    // Wait for the song to change and playback to initialize
+                    try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+
+                    // Check if the new song has markers
+                    if let currentSong = musicService.currentSong,
+                       let newMarkedSong = markedSongs.first(where: { $0.appleMusicID == currentSong.id.rawValue }),
+                       let lastMarker = newMarkedSong.sortedMarkers.last {
+                        // Navigate to the last marker of the new song
+                        let startTime = max(0, lastMarker.timestamp - defaultCueTime)
+                        await musicService.seek(to: startTime)
+                        try? await musicService.play()
+                    }
+                    // If no markers, just let it play from the beginning
+                } catch {
+                    // If skipping fails (no previous song), trigger error haptic
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.error)
+                }
+            }
         }
     }
 
