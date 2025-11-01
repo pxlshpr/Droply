@@ -28,6 +28,7 @@ struct NowPlayingView: View {
     @State private var meshColors: [Color]? // Colors for mesh gradient visualizations
     @State private var backgroundMeshColors: [Color]? // Colors for background mesh gradient
     @AppStorage("defaultCueTime") private var defaultCueTime: Double = 5.0
+    @Namespace private var recentlyMarkedNamespace
     @AppStorage("cueVisualizationMode") private var visualizationMode: String = CueVisualizationMode.button.rawValue
 
     // Preview state
@@ -572,25 +573,25 @@ struct NowPlayingView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 16) {
-                        Button {
-                            showingRecentlyMarked = true
-                        } label: {
-                            Image(systemName: "clock.arrow.circlepath")
-                                .font(.title3)
-                                .foregroundStyle(.white)
-                        }
-
-                        Button {
-                            showingSettings = true
-                        } label: {
-                            Image(systemName: "gearshape")
-                                .font(.title3)
-                                .foregroundStyle(.white)
-                        }
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        showingSettings = true
+                    } label: {
+                        Image(systemName: "gearshape")
+                            .font(.title3)
+                            .foregroundStyle(.white)
                     }
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showingRecentlyMarked = true
+                    } label: {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .font(.title3)
+                            .foregroundStyle(.white)
+                    }
+                }
+                .matchedTransitionSource(id: "recentlyMarked", in: recentlyMarkedNamespace)
 
 //                ToolbarItem(placement: .bottomBar) {
 //                    Button {
@@ -628,10 +629,11 @@ struct NowPlayingView: View {
                 }
             }
             .sheet(isPresented: $showingRecentlyMarked) {
-                RecentlyMarkedView()
+                RecentlyMarkedView(namespace: recentlyMarkedNamespace)
                     .presentationDetents([.medium, .large], selection: $recentlyMarkedDetent)
                     .presentationBackgroundInteraction(.enabled(upThrough: .medium))
                     .presentationBackground(.ultraThinMaterial)
+                    .navigationTransition(.zoom(sourceID: "recentlyMarked", in: recentlyMarkedNamespace))
             }
             .sheet(isPresented: $showingSettings) {
                 SettingsView()

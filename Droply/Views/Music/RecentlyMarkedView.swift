@@ -10,6 +10,8 @@ import SwiftData
 import MusicKit
 
 struct RecentlyMarkedView: View {
+    let namespace: Namespace.ID
+
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var musicService = MusicKitService.shared
@@ -340,6 +342,14 @@ struct RecentlyMarkedRow: View {
 }
 
 #Preview {
+    struct PreviewWrapper: View {
+        @Namespace private var namespace
+
+        var body: some View {
+            RecentlyMarkedView(namespace: namespace)
+        }
+    }
+
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
     let container = try! ModelContainer(for: MarkedSong.self, SongMarker.self, configurations: config)
 
@@ -362,6 +372,6 @@ struct RecentlyMarkedRow: View {
     song2.lastMarkedAt = Date().addingTimeInterval(-3600)
     container.mainContext.insert(song2)
 
-    return RecentlyMarkedView()
+    return PreviewWrapper()
         .modelContainer(container)
 }
