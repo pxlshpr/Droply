@@ -17,8 +17,10 @@ struct NowPlayingView: View {
     @State private var showingAddMarker = false
     @State private var showingEditMarker = false
     @State private var showingRecentlyMarked = false
+    @State private var showingSettings = false
     @State private var showingCueTimeSelector = false
     @State private var recentlyMarkedDetent: PresentationDetent = .medium
+    @State private var settingsDetent: PresentationDetent = .medium
     @State private var markerToEdit: SongMarker?
     @State private var selectedMarker: SongMarker?
     @State private var backgroundColor1: Color = .purple.opacity(0.3)
@@ -570,33 +572,23 @@ struct NowPlayingView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Menu {
+                ToolbarItem(placement: .topBarTrailing) {
+                    HStack(spacing: 16) {
                         Button {
                             showingRecentlyMarked = true
                         } label: {
-                            Label("Recently Marked", systemImage: "clock.arrow.circlepath")
+                            Image(systemName: "clock.arrow.circlepath")
+                                .font(.title3)
+                                .foregroundStyle(.white)
                         }
 
-                        Divider()
-
-                        Section("Cue Visualization") {
-                            ForEach(CueVisualizationMode.allCases) { mode in
-                                Button {
-                                    visualizationMode = mode.rawValue
-                                } label: {
-                                    Label(
-                                        mode.rawValue,
-                                        systemImage: mode.icon
-                                    )
-                                }
-                                .disabled(visualizationMode == mode.rawValue)
-                            }
+                        Button {
+                            showingSettings = true
+                        } label: {
+                            Image(systemName: "gearshape")
+                                .font(.title3)
+                                .foregroundStyle(.white)
                         }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                            .font(.title3)
-                            .foregroundStyle(.white)
                     }
                 }
 
@@ -638,6 +630,12 @@ struct NowPlayingView: View {
             .sheet(isPresented: $showingRecentlyMarked) {
                 RecentlyMarkedView()
                     .presentationDetents([.medium, .large], selection: $recentlyMarkedDetent)
+                    .presentationBackgroundInteraction(.enabled(upThrough: .medium))
+                    .presentationBackground(.ultraThinMaterial)
+            }
+            .sheet(isPresented: $showingSettings) {
+                SettingsView()
+                    .presentationDetents([.medium, .large], selection: $settingsDetent)
                     .presentationBackgroundInteraction(.enabled(upThrough: .medium))
                     .presentationBackground(.ultraThinMaterial)
             }
