@@ -58,14 +58,18 @@ struct NowPlayingView: View {
         NavigationStack {
             GeometryReader { geometry in
                 ZStack {
-                    // Dynamic background gradient from artwork colors
+                    /// Solid dark background layer (consistent in light and dark mode)
+                    Color.black
+                        .ignoresSafeArea()
+
+                    /// Dynamic background gradient from artwork colors
                     if #available(iOS 18.0, *), let bgMeshColors = backgroundMeshColors, !isPreview {
-                        // Use mesh gradient background on iOS 18+
+                        /// Use mesh gradient background on iOS 18+
                         StaticMeshGradient(colors: bgMeshColors)
                             .ignoresSafeArea()
                             .animation(.easeInOut(duration: 0.8), value: backgroundMeshColors)
                     } else {
-                        // Fallback linear gradient
+                        /// Fallback linear gradient
                         LinearGradient(
                             colors: isPreview ? [Color(white: 0.1), Color(white: 0.15)] : [backgroundColor1, backgroundColor2],
                             startPoint: .topLeading,
@@ -889,7 +893,10 @@ struct NowPlayingView: View {
                             meshColors = palette.vibrantMeshColors.map { Color(uiColor: $0) }
 
                             // Update background mesh colors (using base mesh colors, darkened)
-                            backgroundMeshColors = palette.meshColors.map { Color(uiColor: $0).opacity(0.3) }
+                            backgroundMeshColors = palette.meshColors.map {
+                                Color(uiColor: $0)
+                                    .opacity(0.3)
+                            }
                         }
                     }
                 } else {
