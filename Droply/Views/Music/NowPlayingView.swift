@@ -23,6 +23,8 @@ struct NowPlayingView: View {
     @State private var selectedMarker: SongMarker?
     @State private var backgroundColor1: Color = .purple.opacity(0.3)
     @State private var backgroundColor2: Color = .blue.opacity(0.3)
+    @State private var meshColors: [Color]? // Colors for mesh gradient visualizations
+    @State private var backgroundMeshColors: [Color]? // Colors for background mesh gradient
     @AppStorage("defaultCueTime") private var defaultCueTime: Double = 5.0
     @AppStorage("cueVisualizationMode") private var visualizationMode: String = CueVisualizationMode.button.rawValue
 
@@ -57,14 +59,22 @@ struct NowPlayingView: View {
             GeometryReader { geometry in
                 ZStack {
                     // Dynamic background gradient from artwork colors
-                    LinearGradient(
-                        colors: isPreview ? [Color(white: 0.1), Color(white: 0.15)] : [backgroundColor1, backgroundColor2],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .ignoresSafeArea()
-                    .animation(.easeInOut(duration: 0.8), value: backgroundColor1)
-                    .animation(.easeInOut(duration: 0.8), value: backgroundColor2)
+                    if #available(iOS 18.0, *), let bgMeshColors = backgroundMeshColors, !isPreview {
+                        // Use mesh gradient background on iOS 18+
+                        StaticMeshGradient(colors: bgMeshColors)
+                            .ignoresSafeArea()
+                            .animation(.easeInOut(duration: 0.8), value: backgroundMeshColors)
+                    } else {
+                        // Fallback linear gradient
+                        LinearGradient(
+                            colors: isPreview ? [Color(white: 0.1), Color(white: 0.15)] : [backgroundColor1, backgroundColor2],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                        .ignoresSafeArea()
+                        .animation(.easeInOut(duration: 0.8), value: backgroundColor1)
+                        .animation(.easeInOut(duration: 0.8), value: backgroundColor2)
+                    }
 
                 VStack(spacing: 0) {
                 if musicService.isCheckingPlayback && !isPreview {
@@ -183,14 +193,7 @@ struct NowPlayingView: View {
                                     .contentTransition(.numericText())
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 8)
-                                    .background(
-                                        LinearGradient(
-                                            colors: [backgroundColor2, backgroundColor1],
-                                            startPoint: .bottomTrailing,
-                                            endPoint: .topLeading
-                                        )
-                                    )
-                                    .cornerRadius(12)
+                                    .glassEffect(.regular.tint(backgroundColor1).interactive())
                             }
 
                             Text("/")
@@ -307,7 +310,8 @@ struct NowPlayingView: View {
                                 },
                                 onMarkerDelete: { marker in
                                     deleteMarker(marker)
-                                }
+                                },
+                                meshColors: meshColors
                             )
                             .frame(maxWidth: availableWidth)
                         } else {
@@ -351,7 +355,8 @@ struct NowPlayingView: View {
                                 isActive: cueManager.currentCue != nil,
                                 onTap: {
                                     showingCueTimeSelector = true
-                                }
+                                },
+                                meshColors: meshColors
                             )
                             .padding(.horizontal, 16)
                             .padding(.top, 8)
@@ -439,14 +444,7 @@ struct NowPlayingView: View {
                                     .foregroundStyle(.white)
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 8)
-                                    .background(
-                                        LinearGradient(
-                                            colors: [backgroundColor2, backgroundColor1],
-                                            startPoint: .bottomTrailing,
-                                            endPoint: .topLeading
-                                        )
-                                    )
-                                    .cornerRadius(12)
+                                    .glassEffect(.regular.tint(backgroundColor1).interactive())
                             }
 
                             Text("/")
@@ -557,7 +555,8 @@ struct NowPlayingView: View {
                                 isActive: cueManager.currentCue != nil,
                                 onTap: {
                                     showingCueTimeSelector = true
-                                }
+                                },
+                                meshColors: meshColors
                             )
                             .padding(.horizontal, 16)
                             .padding(.top, 8)
@@ -682,7 +681,8 @@ struct NowPlayingView: View {
                         remainingTime: cue.endTime - musicService.playbackTime,
                         onDismiss: {
                             cueManager.showFullscreenVisualization = false
-                        }
+                        },
+                        meshColors: meshColors
                     )
                 }
             }
@@ -823,11 +823,14 @@ struct NowPlayingView: View {
         // Keep reference to song before deleting the marker
         let song = marker.song
 
+        // Check if this is the last marker BEFORE deletion
+        let markerCount = song?.markers?.count ?? 0
+        let isLastMarker = markerCount <= 1
+
         modelContext.delete(marker)
 
-        // If the song has no more markers, delete it
-        if let song = song,
-           (song.markers?.isEmpty ?? true) || song.sortedMarkers.isEmpty {
+        // If this was the last marker, delete the entire song
+        if let song = song, isLastMarker {
             modelContext.delete(song)
         }
 
@@ -862,6 +865,8 @@ struct NowPlayingView: View {
             withAnimation(.easeInOut(duration: 0.8)) {
                 backgroundColor1 = .purple.opacity(0.3)
                 backgroundColor2 = .blue.opacity(0.3)
+                meshColors = nil
+                backgroundMeshColors = nil
             }
             return
         }
@@ -872,12 +877,29 @@ struct NowPlayingView: View {
                 let (data, _) = try await URLSession.shared.data(from: url)
                 guard let image = UIImage(data: data) else { return }
 
-                // Extract colors
-                if let colors = await ColorExtractor.extractColors(from: image) {
+                // Extract comprehensive color palette
+                if let palette = await ColorExtractor.extractColorPalette(from: image) {
                     await MainActor.run {
                         withAnimation(.easeInOut(duration: 0.8)) {
-                            backgroundColor1 = Color(uiColor: colors.color1)
-                            backgroundColor2 = Color(uiColor: colors.color2)
+                            // Update background colors (using darkened colors)
+                            backgroundColor1 = Color(uiColor: palette.backgroundColors.color1)
+                            backgroundColor2 = Color(uiColor: palette.backgroundColors.color2)
+
+                            // Update mesh colors for visualizations (using vibrant colors)
+                            meshColors = palette.vibrantMeshColors.map { Color(uiColor: $0) }
+
+                            // Update background mesh colors (using base mesh colors, darkened)
+                            backgroundMeshColors = palette.meshColors.map { Color(uiColor: $0).opacity(0.3) }
+                        }
+                    }
+                } else {
+                    // Fallback to old method if palette extraction fails
+                    if let colors = await ColorExtractor.extractColors(from: image) {
+                        await MainActor.run {
+                            withAnimation(.easeInOut(duration: 0.8)) {
+                                backgroundColor1 = Color(uiColor: colors.color1)
+                                backgroundColor2 = Color(uiColor: colors.color2)
+                            }
                         }
                     }
                 }

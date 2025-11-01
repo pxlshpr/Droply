@@ -12,6 +12,7 @@ struct CueButtonVisualization: View {
     let cueTime: Double
     let isActive: Bool
     let onTap: () -> Void
+    var meshColors: [Color]? // Optional mesh gradient colors from artwork
 
     @State private var shimmerOffset: CGFloat = -1
 
@@ -44,20 +45,29 @@ struct CueButtonVisualization: View {
                         RoundedRectangle(cornerRadius: 12)
                             .fill(.white.opacity(0.15))
 
-                        // Progress fill with sparkly gradient
+                        // Progress fill with mesh gradient or fallback
                         if isActive && progress > 0 {
                             ZStack {
-                                // Main gradient fill
-                                LinearGradient(
-                                    colors: [
-                                        .pink.opacity(0.8),
-                                        .purple.opacity(0.8),
-                                        .blue.opacity(0.8),
-                                        .cyan.opacity(0.8)
-                                    ],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
+                                // Use mesh gradient if available and iOS 18+
+                                if #available(iOS 18.0, *), let meshColors = meshColors {
+                                    AnimatedMeshGradient(
+                                        colors: meshColors,
+                                        progress: progress,
+                                        isAnimated: true
+                                    )
+                                } else {
+                                    // Fallback linear gradient
+                                    LinearGradient(
+                                        colors: [
+                                            .pink.opacity(0.8),
+                                            .purple.opacity(0.8),
+                                            .blue.opacity(0.8),
+                                            .cyan.opacity(0.8)
+                                        ],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                }
 
                                 // Shimmer effect overlay
                                 LinearGradient(

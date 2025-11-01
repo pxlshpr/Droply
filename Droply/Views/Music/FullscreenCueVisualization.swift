@@ -12,6 +12,7 @@ struct FullscreenCueVisualization: View {
     let progress: Double // 0.0 to 1.0
     let remainingTime: TimeInterval
     let onDismiss: () -> Void
+    var meshColors: [Color]? // Optional mesh gradient colors from artwork
 
     @State private var pulseScale: CGFloat = 1.0
     @State private var outerRingRotation: Double = 0
@@ -25,17 +26,33 @@ struct FullscreenCueVisualization: View {
     var body: some View {
         ZStack {
             // Dynamic gradient background
-            RadialGradient(
-                colors: [
-                    backgroundColorForProgress.opacity(0.4),
-                    backgroundColorForProgress.opacity(0.1),
-                    .black
-                ],
-                center: .center,
-                startRadius: 100,
-                endRadius: 500
-            )
-            .ignoresSafeArea()
+            if #available(iOS 18.0, *), let meshColors = meshColors {
+                // Use animated mesh gradient for background
+                AnimatedMeshGradient(
+                    colors: meshColors.map { $0.opacity(0.3) },
+                    progress: progress * 0.5, // Subtle animation
+                    isAnimated: true
+                )
+                .ignoresSafeArea()
+                .overlay {
+                    // Add a dark overlay to ensure text readability
+                    Color.black.opacity(0.4)
+                        .ignoresSafeArea()
+                }
+            } else {
+                // Fallback radial gradient
+                RadialGradient(
+                    colors: [
+                        backgroundColorForProgress.opacity(0.4),
+                        backgroundColorForProgress.opacity(0.1),
+                        .black
+                    ],
+                    center: .center,
+                    startRadius: 100,
+                    endRadius: 500
+                )
+                .ignoresSafeArea()
+            }
 
             // Animated particle field
             Canvas { context, size in
@@ -65,12 +82,12 @@ struct FullscreenCueVisualization: View {
 
                 // Central circular progress with pulsating effect
                 ZStack {
-                    // Outer rotating ring
+                    // Outer rotating ring with mesh gradient colors
                     Circle()
                         .trim(from: 0, to: progress)
                         .stroke(
                             AngularGradient(
-                                colors: [
+                                colors: meshColors ?? [
                                     .pink,
                                     .purple,
                                     .blue,
@@ -84,7 +101,7 @@ struct FullscreenCueVisualization: View {
                         .animation(.linear, value: progress)
                         .frame(width: 280, height: 280)
                         .rotationEffect(.degrees(outerRingRotation))
-                        .shadow(color: .purple.opacity(0.8), radius: 20)
+                        .shadow(color: (meshColors?.first ?? .purple).opacity(0.8), radius: 20)
 
                     // Middle pulsating ring
                     Circle()

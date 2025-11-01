@@ -14,6 +14,124 @@ import DominantColors
 struct ColorExtractor {
     private static let logger = Logger(subsystem: "com.droply.app", category: "ColorExtraction")
 
+    /// Result containing both background colors and visualization colors
+    struct ColorPalette {
+        let backgroundColors: (color1: UIColor, color2: UIColor)
+        let meshColors: [UIColor] // 9 colors for 3x3 mesh
+        let vibrantMeshColors: [UIColor] // Brightened versions for visualizations
+    }
+
+    /// Extract comprehensive color palette from an image
+    static func extractColorPalette(from image: UIImage) async -> ColorPalette? {
+        // Extract multiple colors for mesh gradient
+        guard let meshColors = await extractMeshColors(from: image, count: 9) else {
+            return nil
+        }
+
+        // Get two primary colors for background (darkened)
+        let darkened1 = ensureDarkEnough(meshColors[0])
+        let darkened2 = ensureDarkEnough(meshColors[meshColors.count - 1])
+
+        // Create vibrant versions for visualizations
+        let vibrantColors = meshColors.map { makeVibrant($0) }
+
+        return ColorPalette(
+            backgroundColors: (darkened1, darkened2),
+            meshColors: meshColors,
+            vibrantMeshColors: vibrantColors
+        )
+    }
+
+    /// Extract multiple colors for mesh gradient
+    private static func extractMeshColors(from image: UIImage, count: Int) async -> [UIColor]? {
+        logger.debug("Starting mesh color extraction from image (count: \(count))")
+
+        return await withCheckedContinuation { continuation in
+            Task.detached(priority: .userInitiated) {
+                guard let cgImage = image.cgImage ?? image.preparingForDisplay()?.cgImage else {
+                    logger.error("Failed to get CGImage from UIImage")
+                    continuation.resume(returning: nil)
+                    return
+                }
+
+                // Try DominantColors first
+                if let cgColors = try? DominantColors.dominantColors(image: cgImage, quality: .fair),
+                   !cgColors.isEmpty {
+                    logger.debug("DominantColors succeeded, extracted \(cgColors.count) colors")
+
+                    // Convert to UIColors
+                    let uiColors: [UIColor] = cgColors.prefix(count).compactMap { cg in
+                        if let srgb = cg.converted(to: CGColorSpace(name: CGColorSpace.sRGB)!, intent: .defaultIntent, options: nil) {
+                            return UIColor(cgColor: srgb)
+                        } else {
+                            return UIColor(cgColor: cg)
+                        }
+                    }
+
+                    // Ensure we have enough colors by duplicating/interpolating if needed
+                    let finalColors = ensureColorCount(uiColors, targetCount: count)
+                    logger.debug("Mesh color extraction successful with \(finalColors.count) colors")
+                    continuation.resume(returning: finalColors)
+                    return
+                }
+
+                // Fallback to k-means with multiple clusters
+                logger.debug("DominantColors failed, attempting k-means fallback")
+                if let colors = kmeansMultipleColors(from: cgImage, k: count) {
+                    logger.debug("K-means extraction successful with \(colors.count) colors")
+                    continuation.resume(returning: colors)
+                    return
+                }
+
+                logger.error("All color extraction methods failed")
+                continuation.resume(returning: nil)
+            }
+        }
+    }
+
+    /// Ensure we have exactly the target count of colors
+    private static func ensureColorCount(_ colors: [UIColor], targetCount: Int) -> [UIColor] {
+        if colors.count >= targetCount {
+            return Array(colors.prefix(targetCount))
+        }
+
+        // Interpolate between existing colors to reach target count
+        var result = colors
+        while result.count < targetCount {
+            let idx = result.count % (colors.count - 1)
+            let color1 = colors[idx]
+            let color2 = colors[idx + 1]
+            result.append(interpolateColor(color1, color2, t: 0.5))
+        }
+        return Array(result.prefix(targetCount))
+    }
+
+    /// Interpolate between two colors
+    private static func interpolateColor(_ c1: UIColor, _ c2: UIColor, t: CGFloat) -> UIColor {
+        var r1: CGFloat = 0, g1: CGFloat = 0, b1: CGFloat = 0, a1: CGFloat = 0
+        var r2: CGFloat = 0, g2: CGFloat = 0, b2: CGFloat = 0, a2: CGFloat = 0
+        c1.getRed(&r1, green: &g1, blue: &b1, alpha: &a1)
+        c2.getRed(&r2, green: &g2, blue: &b2, alpha: &a2)
+        return UIColor(
+            red: r1 + (r2 - r1) * t,
+            green: g1 + (g2 - g1) * t,
+            blue: b1 + (b2 - b1) * t,
+            alpha: a1 + (a2 - a1) * t
+        )
+    }
+
+    /// Make a color more vibrant for visualizations
+    private static func makeVibrant(_ color: UIColor) -> UIColor {
+        var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        color.getHue(&h, saturation: &s, brightness: &b, alpha: &a)
+
+        // Increase saturation and brightness significantly
+        let newS = min(1.0, s * 1.5 + 0.3) // Boost saturation
+        let newB = min(1.0, b * 1.3 + 0.2) // Boost brightness
+
+        return UIColor(hue: h, saturation: newS, brightness: newB, alpha: a)
+    }
+
     /// Extract two dominant colors from an image and ensure they're dark enough for white text
     static func extractColors(from image: UIImage) async -> (color1: UIColor, color2: UIColor)? {
         logger.debug("Starting color extraction from image")
@@ -80,6 +198,100 @@ struct ColorExtractor {
     }
 
     // MARK: - K-Means Extraction
+
+    private static func kmeansMultipleColors(from cgImage: CGImage, k: Int) -> [UIColor]? {
+        // Downscale for performance
+        let targetSize = 64
+        guard let resized = resizeCGImage(cgImage, to: CGSize(width: targetSize, height: targetSize)) else {
+            return nil
+        }
+
+        guard let data = rgba8Data(from: resized) else {
+            return nil
+        }
+
+        let pixelCount = data.count / 4
+        if pixelCount == 0 { return nil }
+
+        // Prepare samples (RGB only)
+        var samples = [Float](repeating: 0, count: pixelCount * 3)
+        for i in 0..<pixelCount {
+            let r = Float(data[i*4 + 0]) / 255.0
+            let g = Float(data[i*4 + 1]) / 255.0
+            let b = Float(data[i*4 + 2]) / 255.0
+            samples[i*3 + 0] = r
+            samples[i*3 + 1] = g
+            samples[i*3 + 2] = b
+        }
+
+        // Initialize k centroids from different parts of the image
+        var centroids = [SIMD3<Float>]()
+        for i in 0..<k {
+            let idx = (pixelCount / k) * i
+            if idx * 3 + 2 < samples.count {
+                centroids.append(SIMD3<Float>(samples[idx*3], samples[idx*3 + 1], samples[idx*3 + 2]))
+            }
+        }
+
+        if centroids.count < k {
+            return nil
+        }
+
+        // K-means iterations
+        let maxIterations = 15
+        for _ in 0..<maxIterations {
+            var sums = [SIMD3<Float>](repeating: SIMD3<Float>(0, 0, 0), count: k)
+            var counts = [Int](repeating: 0, count: k)
+
+            // Assignment step
+            for i in 0..<pixelCount {
+                let p = SIMD3<Float>(samples[i*3 + 0], samples[i*3 + 1], samples[i*3 + 2])
+                var minDist: Float = Float.infinity
+                var minIdx = 0
+
+                for j in 0..<k {
+                    let dist = distanceSquared(p, centroids[j])
+                    if dist < minDist {
+                        minDist = dist
+                        minIdx = j
+                    }
+                }
+
+                sums[minIdx] += p
+                counts[minIdx] += 1
+            }
+
+            // Update step
+            var converged = true
+            for j in 0..<k {
+                if counts[j] == 0 {
+                    // Reinitialize empty cluster
+                    let idx = (pixelCount / k) * j
+                    centroids[j] = SIMD3<Float>(samples[idx*3], samples[idx*3 + 1], samples[idx*3 + 2])
+                } else {
+                    let newCentroid = sums[j] / Float(counts[j])
+                    if distanceSquared(newCentroid, centroids[j]) > 1e-6 {
+                        converged = false
+                    }
+                    centroids[j] = newCentroid
+                }
+            }
+
+            if converged {
+                break
+            }
+        }
+
+        // Convert centroids to UIColors
+        return centroids.map { c in
+            UIColor(
+                red: CGFloat(clamp01(c.x)),
+                green: CGFloat(clamp01(c.y)),
+                blue: CGFloat(clamp01(c.z)),
+                alpha: 1
+            )
+        }
+    }
 
     private static func kmeansTwoColors(from cgImage: CGImage) -> (UIColor, UIColor)? {
         // Downscale for performance

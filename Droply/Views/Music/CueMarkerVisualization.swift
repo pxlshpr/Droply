@@ -14,6 +14,7 @@ struct CueMarkerVisualization: View {
     let onTap: () -> Void
     let onEdit: (() -> Void)?
     let onDelete: (() -> Void)?
+    var meshColors: [Color]? // Optional mesh gradient colors from artwork
 
     @State private var shimmerOffset: CGFloat = -1
 
@@ -42,20 +43,29 @@ struct CueMarkerVisualization: View {
                                     .stroke(.white.opacity(0.3), lineWidth: 1)
                             )
 
-                        // Progress fill with sparkly gradient
+                        // Progress fill with mesh gradient or fallback
                         if isActive && progress > 0 {
                             ZStack {
-                                // Main gradient fill
-                                LinearGradient(
-                                    colors: [
-                                        .pink.opacity(0.9),
-                                        .purple.opacity(0.9),
-                                        .blue.opacity(0.9),
-                                        .cyan.opacity(0.9)
-                                    ],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
+                                // Use mesh gradient if available and iOS 18+
+                                if #available(iOS 18.0, *), let meshColors = meshColors {
+                                    AnimatedMeshGradient(
+                                        colors: meshColors,
+                                        progress: progress,
+                                        isAnimated: true
+                                    )
+                                } else {
+                                    // Fallback linear gradient
+                                    LinearGradient(
+                                        colors: [
+                                            .pink.opacity(0.9),
+                                            .purple.opacity(0.9),
+                                            .blue.opacity(0.9),
+                                            .cyan.opacity(0.9)
+                                        ],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                }
 
                                 // Shimmer effect overlay
                                 LinearGradient(
@@ -135,6 +145,7 @@ struct HorizontalMarkerStripWithAutoScroll: View {
     let onTap: (SongMarker) -> Void
     let onMarkerEdit: ((SongMarker) -> Void)?
     let onMarkerDelete: ((SongMarker) -> Void)?
+    var meshColors: [Color]? // Optional mesh gradient colors from artwork
 
     @State private var hasScrolledToActive = false
 
@@ -160,7 +171,8 @@ struct HorizontalMarkerStripWithAutoScroll: View {
                                     isActive: true,
                                     onTap: { onTap(marker) },
                                     onEdit: onMarkerEdit != nil ? { onMarkerEdit?(marker) } : nil,
-                                    onDelete: onMarkerDelete != nil ? { onMarkerDelete?(marker) } : nil
+                                    onDelete: onMarkerDelete != nil ? { onMarkerDelete?(marker) } : nil,
+                                    meshColors: meshColors
                                 )
                                 .id(marker.id)
                             } else {
