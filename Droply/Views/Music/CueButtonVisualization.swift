@@ -52,16 +52,20 @@ struct CueButtonVisualization: View {
                 }
             }
             .padding(.horizontal, 12)
-            .padding(.vertical, 12)
+            .padding(.vertical, 10)
             .background(
                 GeometryReader { geometry in
                     ZStack(alignment: .leading) {
-                        // Background
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(.white.opacity(0.15))
+                        // Background capsule
+                        Capsule()
+                            .fill(.white.opacity(0.2))
+                            .overlay(
+                                Capsule()
+                                    .stroke(.white.opacity(0.3), lineWidth: 1)
+                            )
 
                         // Progress fill with mesh gradient or fallback
-                        if isActive && progress > 0 {
+                        if isActive {
                             ZStack {
                                 // Use mesh gradient if available and iOS 18+
                                 if #available(iOS 18.0, *), let meshColors = meshColors {
@@ -112,9 +116,8 @@ struct CueButtonVisualization: View {
                                     }
                                 }
                             }
-                            .frame(width: geometry.size.width * CGFloat(progress))
+                            .frame(width: max(1, geometry.size.width * CGFloat(progress)))
                             .animation(.linear, value: progress)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
                             .shadow(color: .purple.opacity(0.5), radius: 8)
                             .onAppear {
                                 withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
@@ -123,6 +126,7 @@ struct CueButtonVisualization: View {
                             }
                         }
                     }
+                    .mask(Capsule())
                 }
             )
         }

@@ -362,7 +362,7 @@ struct NowPlayingView: View {
                                 loopEnabled: loopModeEnabled,
                                 loopDuration: loopDuration
                             )
-                            .padding(.horizontal, 16)
+                            .padding(.horizontal, 17)
                             .padding(.top, 8)
                         }
                     }
