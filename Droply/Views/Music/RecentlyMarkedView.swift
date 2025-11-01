@@ -65,55 +65,34 @@ struct RecentlyMarkedView: View {
                         description: Text("Songs you mark will appear here")
                     )
                 } else {
-                    VStack(spacing: 0) {
-                        List {
-                            ForEach(groupedSongs, id: \.period) { group in
-                                Section(header: Text(group.period)) {
-                                    ForEach(group.songs) { song in
-                                        RecentlyMarkedRow(song: song)
-                                            .contentShape(Rectangle())
-                                            .onTapGesture {
-                                                Task {
-                                                    await playSong(song)
-                                                }
+                    List {
+                        ForEach(groupedSongs, id: \.period) { group in
+                            Section(header: Text(group.period)) {
+                                ForEach(group.songs) { song in
+                                    RecentlyMarkedRow(song: song)
+                                        .contentShape(Rectangle())
+                                        .onTapGesture {
+                                            Task {
+                                                await playSong(song)
                                             }
-                                    }
+                                        }
                                 }
                             }
                         }
-
-                        // Segmented control for play mode
-                        VStack(spacing: 8) {
-                            Picker("Play Mode", selection: $playMode) {
-                                Text("Start").tag(PlayMode.startOfSong)
-                                Text("Cue at First Marker").tag(PlayMode.cueAtFirstMarker)
-                            }
-                            .pickerStyle(.segmented)
-                            .padding(.horizontal)
-                        }
-                        .padding(.vertical, 12)
-                        .background(.ultraThinMaterial)
                     }
+                    .listStyle(.plain)
                 }
             }
             .navigationTitle("Recently Marked")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        Task {
-                            await playAllSongs()
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "play.fill")
-                                .font(.caption)
-                            Text("Play All")
-                                .font(.subheadline)
-                        }
-                        .foregroundStyle(.primary)
+                    Picker("Play Mode", selection: $playMode) {
+                        Text("Start").tag(PlayMode.startOfSong)
+                        Text("Cue at First Marker").tag(PlayMode.cueAtFirstMarker)
                     }
-                    .disabled(recentlyMarkedSongs.isEmpty)
+                    .pickerStyle(.segmented)
+                    .frame(maxWidth: 280)
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
@@ -125,7 +104,25 @@ struct RecentlyMarkedView: View {
                             .foregroundStyle(.primary)
                     }
                 }
+
+                ToolbarItem(placement: .bottomBar) {
+                    Button {
+                        Task {
+                            await playAllSongs()
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "play.fill")
+                            Text("Play All")
+                        }
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.glassProminent)
+                    .disabled(recentlyMarkedSongs.isEmpty)
+                }
             }
+            .toolbarBackground(.visible, for: .bottomBar)
             .overlay {
                 if isLoading {
                     ZStack {
@@ -333,34 +330,64 @@ struct RecentlyMarkedRow: View {
                                 .foregroundStyle(.secondary)
                         }
                 }
-                .frame(width: 60, height: 60)
-                .cornerRadius(8)
+                .frame(width: 44, height: 44)
+                .cornerRadius(6)
             } else {
                 Rectangle()
                     .fill(.ultraThinMaterial)
                     .overlay {
                         Image(systemName: "music.note")
                             .foregroundStyle(.secondary)
+                            .font(.caption)
                     }
-                    .frame(width: 60, height: 60)
-                    .cornerRadius(8)
+                    .frame(width: 44, height: 44)
+                    .cornerRadius(6)
             }
 
             // Song info
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(song.title)
-                    .font(.headline)
-                    .lineLimit(nil)
+                    .font(.subheadline)
+                    .lineLimit(1)
 
                 Text(song.artist)
-                    .font(.subheadline)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
-                    .lineLimit(nil)
+                    .lineLimit(1)
             }
 
-            Spacer()
+            Spacer(minLength: 8)
+
+            // Marker timeline visualization
+            MarkerTimelineView(song: song)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 2)
+    }
+}
+
+struct MarkerTimelineView: View {
+    let song: MarkedSong
+    private let timelineWidth: CGFloat = 80
+    private let timelineHeight: CGFloat = 2
+
+    var body: some View {
+        ZStack(alignment: .leading) {
+            // Background timeline
+            Rectangle()
+                .fill(.tertiary)
+                .frame(width: timelineWidth, height: timelineHeight)
+                .cornerRadius(1)
+
+            // Markers
+            ForEach(song.sortedMarkers) { marker in
+                let position = (marker.timestamp / song.duration) * timelineWidth
+
+                Text(marker.emoji)
+                    .font(.system(size: 8))
+                    .offset(x: position, y: 0)
+            }
+        }
+        .frame(width: timelineWidth, height: 16)
     }
 }
 
