@@ -19,7 +19,6 @@ struct NowPlayingView: View {
     @State private var showingRecentlyMarked = false
     @State private var showingSettings = false
     @State private var showingCueTimeSelector = false
-    @State private var recentlyMarkedDetent: PresentationDetent = .medium
     @State private var settingsDetent: PresentationDetent = .medium
     @State private var markerToEdit: SongMarker?
     @State private var selectedMarker: SongMarker?
@@ -630,7 +629,6 @@ struct NowPlayingView: View {
             }
             .sheet(isPresented: $showingRecentlyMarked) {
                 RecentlyMarkedView(namespace: recentlyMarkedNamespace)
-                    .presentationDetents([.medium, .large], selection: $recentlyMarkedDetent)
                     .presentationBackgroundInteraction(.enabled(upThrough: .medium))
                     .presentationBackground(.ultraThinMaterial)
                     .navigationTransition(.zoom(sourceID: "recentlyMarked", in: recentlyMarkedNamespace))
@@ -768,9 +766,31 @@ struct NowPlayingView: View {
                 try? await musicService.play()
             }
         } else {
-            // No next marker found - error haptic
-            let generator = UINotificationFeedbackGenerator()
-            generator.notificationOccurred(.error)
+            // No next marker found in current song - try to skip to next song
+            Task {
+                do {
+                    // Try to skip to the next song in the queue
+                    try await musicService.skipToNextItem()
+
+                    // Wait for the song to change and playback to initialize
+                    try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+
+                    // Check if the new song has markers
+                    if let currentSong = musicService.currentSong,
+                       let newMarkedSong = markedSongs.first(where: { $0.appleMusicID == currentSong.id.rawValue }),
+                       let firstMarker = newMarkedSong.sortedMarkers.first {
+                        // Navigate to the first marker of the new song
+                        let startTime = max(0, firstMarker.timestamp - defaultCueTime)
+                        await musicService.seek(to: startTime)
+                        try? await musicService.play()
+                    }
+                    // If no markers, just let it play from the beginning
+                } catch {
+                    // If skipping fails (no next song), trigger error haptic
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.error)
+                }
+            }
         }
     }
 

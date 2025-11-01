@@ -159,39 +159,62 @@ struct RecentlyMarkedView: View {
         errorMessage = nil
 
         do {
-            // Fetch the song from MusicKit using the Apple Music ID
-            let request = MusicCatalogResourceRequest<Song>(
-                matching: \.id,
-                equalTo: MusicItemID(markedSong.appleMusicID)
-            )
-            let response = try await request.response()
-
-            guard let song = response.items.first else {
-                errorMessage = "Could not find song in Apple Music"
+            // Find the index of the tapped song
+            guard let tappedIndex = recentlyMarkedSongs.firstIndex(where: { $0.id == markedSong.id }) else {
+                errorMessage = "Could not find song in recently marked list"
                 isLoading = false
                 return
             }
 
-            // Play the song using the queue manager
-            try await musicService.playSongWithQueueManager(song)
+            // Create cyclical queue: from tapped song to end, then start to before tapped song
+            let songsFromTappedToEnd = Array(recentlyMarkedSongs[tappedIndex...])
+            let songsFromStartToBeforeTapped = Array(recentlyMarkedSongs[..<tappedIndex])
+            let cyclicalQueue = songsFromTappedToEnd + songsFromStartToBeforeTapped
+
+            // Fetch all songs from MusicKit
+            var songs: [Song] = []
+
+            for markedSong in cyclicalQueue {
+                let request = MusicCatalogResourceRequest<Song>(
+                    matching: \.id,
+                    equalTo: MusicItemID(markedSong.appleMusicID)
+                )
+                let response = try await request.response()
+
+                if let song = response.items.first {
+                    songs.append(song)
+                } else {
+                    // Log warning but continue with other songs
+                    print("Warning: Could not find song '\(markedSong.title)' in Apple Music")
+                }
+            }
+
+            guard !songs.isEmpty else {
+                errorMessage = "Could not find any songs in Apple Music"
+                isLoading = false
+                return
+            }
+
+            // Play all songs using the queue manager
+            try await musicService.playSongsWithQueueManager(songs)
 
             // Wait a moment for playback to initialize before seeking
             try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
 
-            // Handle play mode - seek after starting playback
+            // Handle play mode for the first song (the tapped song) - seek after starting playback
             switch playMode {
             case .startOfSong:
                 // Already playing from beginning
                 break
             case .cueAtFirstMarker:
-                // Seek to first marker if available
+                // Seek to first marker of the tapped song if available
                 if let firstMarker = markedSong.sortedMarkers.first {
                     let startTime = max(0, firstMarker.timestamp - (firstMarker.cueTime))
                     await musicService.seek(to: startTime)
                 }
             }
 
-            // Update last played at
+            // Update last played at for the tapped song
             markedSong.lastPlayedAt = Date()
             try? modelContext.save()
 
