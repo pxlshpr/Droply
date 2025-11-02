@@ -48,56 +48,9 @@ class HapticManager {
     /// Plays a delightful "musical ping" haptic pattern
     /// Creates a bouncy, musical feel like plucking a string
     func playMusicalPing() {
-        guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else {
-            print("Device doesn't support haptics, using fallback")
-            // Fallback to basic haptic on unsupported devices
-            let generator = UIImpactFeedbackGenerator(style: .medium)
-            generator.impactOccurred()
-            return
-        }
-
-        // Ensure engine exists and is running
-        guard let engine = engine else {
-            print("Haptic engine not initialized, using fallback")
-            let generator = UIImpactFeedbackGenerator(style: .medium)
-            generator.impactOccurred()
-            return
-        }
-
-        do {
-            // Restart engine if it's not running
-            try engine.start()
-
-            // First tap - sharp and strong (like striking a note)
-            let strongTap = CHHapticEvent(
-                eventType: .hapticTransient,
-                parameters: [
-                    CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0),
-                    CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.8)
-                ],
-                relativeTime: 0
-            )
-
-            // Echo tap - softer and rounder (like the note resonating)
-            let echoTap = CHHapticEvent(
-                eventType: .hapticTransient,
-                parameters: [
-                    CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.4),
-                    CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.3)
-                ],
-                relativeTime: 0.05 // 50ms after the first tap
-            )
-
-            let pattern = try CHHapticPattern(events: [strongTap, echoTap], parameters: [])
-            let player = try engine.makePlayer(with: pattern)
-            try player.start(atTime: CHHapticTimeImmediate)
-
-            print("Musical ping haptic played successfully")
-        } catch {
-            print("Failed to play haptic pattern: \(error)")
-            // Fallback to basic haptic
-            let generator = UIImpactFeedbackGenerator(style: .medium)
-            generator.impactOccurred()
-        }
+        // Use rigid haptic for now - more reliable and satisfying
+        let generator = UIImpactFeedbackGenerator(style: .rigid)
+        generator.prepare()
+        generator.impactOccurred(intensity: 1.0)
     }
 }

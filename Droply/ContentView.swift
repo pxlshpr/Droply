@@ -98,9 +98,13 @@ struct ContentView: View {
                     .padding(.bottom, 12)
                 }
             }
-            .navigationTitle("Recently Marked")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("Droply")
+                        .font(.system(size: 32, weight: .black).width(.condensed))
+                }
+
                 ToolbarItem(placement: .topBarLeading) {
                     Menu {
                         Button {
