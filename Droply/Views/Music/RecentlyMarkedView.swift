@@ -74,11 +74,10 @@ struct RecentlyMarkedView: View {
                             systemImage: "music.note.list",
                             description: Text("Songs you mark will appear here")
                         )
-                        .foregroundStyle(.white)
                     } else {
                         List {
                             ForEach(groupedSongs, id: \.period) { group in
-                                Section(header: Text(group.period).foregroundStyle(.white)) {
+                                Section(header: Text(group.period)) {
                                     ForEach(group.songs) { song in
                                         RecentlyMarkedRow(song: song)
                                             .contentShape(Rectangle())
@@ -141,7 +140,6 @@ struct RecentlyMarkedView: View {
                             Text(playMode == .startOfSong ? "Start" : "Drop in")
                                 .font(.subheadline)
                         }
-                        .foregroundStyle(.white)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
                         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
@@ -159,7 +157,6 @@ struct RecentlyMarkedView: View {
                             Text("Play All")
                         }
                         .font(.headline)
-                        .foregroundStyle(.white)
                     }
                     .buttonStyle(.glassProminent)
                     .disabled(recentlyMarkedSongs.isEmpty)
@@ -344,7 +341,7 @@ struct RecentlyMarkedRow: View {
                         .fill(.ultraThinMaterial)
                         .overlay {
                             Image(systemName: "music.note")
-                                .foregroundStyle(.white.opacity(0.5))
+                                .foregroundStyle(.secondary)
                         }
                 }
                 .frame(width: 44, height: 44)
@@ -354,7 +351,7 @@ struct RecentlyMarkedRow: View {
                     .fill(.ultraThinMaterial)
                     .overlay {
                         Image(systemName: "music.note")
-                            .foregroundStyle(.white.opacity(0.5))
+                            .foregroundStyle(.secondary)
                             .font(.caption)
                     }
                     .frame(width: 44, height: 44)
@@ -365,12 +362,11 @@ struct RecentlyMarkedRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(song.title)
                     .font(.subheadline)
-                    .foregroundStyle(.white)
                     .lineLimit(1)
 
                 Text(song.artist)
                     .font(.caption)
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
 
@@ -392,7 +388,7 @@ struct SongMarkerPreview: View {
         ZStack(alignment: .leading) {
             // Background capsule representing song length
             Capsule()
-                .fill(.white.opacity(0.2))
+                .fill(.quaternary)
                 .frame(width: timelineWidth, height: capsuleHeight)
                 .padding(.horizontal, 1)
                 .padding(.vertical, 1)
