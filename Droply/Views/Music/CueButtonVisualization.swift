@@ -18,6 +18,15 @@ struct CueButtonVisualization: View {
 
     @State private var shimmerOffset: CGFloat = -1
 
+    /// Generate subtle two-color gradient
+    private var gradientColors: [Color] {
+        // Subtle gradient with two very similar dark colors for text visibility
+        return [
+            Color(red: 0.25, green: 0.25, blue: 0.35),  // Dark blue-gray
+            Color(red: 0.20, green: 0.20, blue: 0.30),  // Slightly darker blue-gray
+        ]
+    }
+
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 8) {
@@ -64,29 +73,15 @@ struct CueButtonVisualization: View {
                                     .stroke(.white.opacity(0.3), lineWidth: 1)
                             )
 
-                        // Progress fill with mesh gradient or fallback
+                        // Progress fill with linear gradient
                         if isActive {
                             ZStack {
-                                // Use mesh gradient if available and iOS 18+
-                                if #available(iOS 18.0, *), let meshColors = meshColors {
-                                    AnimatedMeshGradient(
-                                        colors: meshColors,
-                                        progress: progress,
-                                        isAnimated: true
-                                    )
-                                } else {
-                                    // Fallback linear gradient
-                                    LinearGradient(
-                                        colors: [
-                                            .pink.opacity(0.8),
-                                            .purple.opacity(0.8),
-                                            .blue.opacity(0.8),
-                                            .cyan.opacity(0.8)
-                                        ],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                }
+                                // Create linear gradient from mesh colors or use complementary fallback
+                                LinearGradient(
+                                    colors: gradientColors,
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
 
                                 // Shimmer effect overlay
                                 LinearGradient(
