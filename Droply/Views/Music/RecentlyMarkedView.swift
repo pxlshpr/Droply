@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import MusicKit
+import NukeUI
 
 struct RecentlyMarkedView: View {
     let namespace: Namespace.ID
@@ -332,17 +333,19 @@ struct RecentlyMarkedRow: View {
             // Artwork
             if let artworkURLString = song.artworkURL,
                let artworkURL = URL(string: artworkURLString) {
-                AsyncImage(url: artworkURL) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    Rectangle()
-                        .fill(.ultraThinMaterial)
-                        .overlay {
-                            Image(systemName: "music.note")
-                                .foregroundStyle(.secondary)
-                        }
+                LazyImage(url: artworkURL) { state in
+                    if let image = state.image {
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } else {
+                        Rectangle()
+                            .fill(.ultraThinMaterial)
+                            .overlay {
+                                Image(systemName: "music.note")
+                                    .foregroundStyle(.secondary)
+                            }
+                    }
                 }
                 .frame(width: 44, height: 44)
                 .cornerRadius(6)

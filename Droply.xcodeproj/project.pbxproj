@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		E2126AF62EB7A8BC002F55FF /* Nuke in Frameworks */ = {isa = PBXBuildFile; productRef = E2126AF52EB7A8BC002F55FF /* Nuke */; };
+		E2126AF82EB7A8BC002F55FF /* NukeUI in Frameworks */ = {isa = PBXBuildFile; productRef = E2126AF72EB7A8BC002F55FF /* NukeUI */; };
 		E2C4857E2EB268090034D2CE /* SpotifyiOS in Frameworks */ = {isa = PBXBuildFile; productRef = E2C4857D2EB268090034D2CE /* SpotifyiOS */; };
 		E2C4875D2EB28E680034D2CE /* DominantColors in Frameworks */ = {isa = PBXBuildFile; productRef = E2C4875C2EB28E680034D2CE /* DominantColors */; };
 /* End PBXBuildFile section */
@@ -70,8 +72,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E2126AF62EB7A8BC002F55FF /* Nuke in Frameworks */,
 				E2C4875D2EB28E680034D2CE /* DominantColors in Frameworks */,
 				E2C4857E2EB268090034D2CE /* SpotifyiOS in Frameworks */,
+				E2126AF82EB7A8BC002F55FF /* NukeUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -134,6 +138,8 @@
 			packageProductDependencies = (
 				E2C4857D2EB268090034D2CE /* SpotifyiOS */,
 				E2C4875C2EB28E680034D2CE /* DominantColors */,
+				E2126AF52EB7A8BC002F55FF /* Nuke */,
+				E2126AF72EB7A8BC002F55FF /* NukeUI */,
 			);
 			productName = Droply;
 			productReference = E26040002EB265F20026C6C8 /* Droply.app */;
@@ -220,6 +226,7 @@
 			packageReferences = (
 				E2C4857C2EB268090034D2CE /* XCRemoteSwiftPackageReference "ios-sdk" */,
 				E2C4875B2EB28E680034D2CE /* XCRemoteSwiftPackageReference "DominantColors" */,
+				E2126AF42EB7A8BC002F55FF /* XCRemoteSwiftPackageReference "Nuke" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E26040012EB265F20026C6C8 /* Products */;
@@ -610,6 +617,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		E2126AF42EB7A8BC002F55FF /* XCRemoteSwiftPackageReference "Nuke" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/kean/Nuke";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.8.0;
+			};
+		};
 		E2C4857C2EB268090034D2CE /* XCRemoteSwiftPackageReference "ios-sdk" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/spotify/ios-sdk";
@@ -629,6 +644,16 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		E2126AF52EB7A8BC002F55FF /* Nuke */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E2126AF42EB7A8BC002F55FF /* XCRemoteSwiftPackageReference "Nuke" */;
+			productName = Nuke;
+		};
+		E2126AF72EB7A8BC002F55FF /* NukeUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E2126AF42EB7A8BC002F55FF /* XCRemoteSwiftPackageReference "Nuke" */;
+			productName = NukeUI;
+		};
 		E2C4857D2EB268090034D2CE /* SpotifyiOS */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = E2C4857C2EB268090034D2CE /* XCRemoteSwiftPackageReference "ios-sdk" */;
