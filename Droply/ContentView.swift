@@ -14,6 +14,7 @@ struct ContentView: View {
     @ObservedObject private var musicService = MusicKitService.shared
     @State private var showingAuthorization = false
     @State private var showingNowPlaying = false
+    @State private var currentPlayTask: Task<Void, Never>?
 
     @Query(
         filter: #Predicate<MarkedSong> { song in
@@ -67,7 +68,11 @@ struct ContentView: View {
                                         RecentlyMarkedRow(song: song)
                                             .contentShape(Rectangle())
                                             .onTapGesture {
-                                                Task {
+                                                // Cancel any existing play task
+                                                currentPlayTask?.cancel()
+
+                                                // Create new play task
+                                                currentPlayTask = Task {
                                                     await playSong(song)
                                                 }
                                             }
@@ -213,6 +218,9 @@ struct ContentView: View {
 
     private func playSong(_ markedSong: MarkedSong) async {
         do {
+            // Check for cancellation before proceeding
+            try Task.checkCancellation()
+
             // Find the index of the tapped song
             guard let tappedIndex = recentlyMarkedSongs.firstIndex(where: { $0.id == markedSong.id }) else {
                 return
@@ -223,10 +231,16 @@ struct ContentView: View {
             let songsFromStartToBeforeTapped = Array(recentlyMarkedSongs[..<tappedIndex])
             let cyclicalQueue = songsFromTappedToEnd + songsFromStartToBeforeTapped
 
+            // Check for cancellation before fetching songs
+            try Task.checkCancellation()
+
             // Fetch all songs from MusicKit
             var songs: [Song] = []
 
             for markedSong in cyclicalQueue {
+                // Check for cancellation during fetching
+                try Task.checkCancellation()
+
                 let request = MusicCatalogResourceRequest<Song>(
                     matching: \.id,
                     equalTo: MusicItemID(markedSong.appleMusicID)
@@ -245,11 +259,14 @@ struct ContentView: View {
                 return
             }
 
+            // Check for cancellation before playing
+            try Task.checkCancellation()
+
             // Play all songs using the queue manager
             try await musicService.playSongsWithQueueManager(songs)
 
             // Wait a moment for playback to initialize before seeking
-            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
 
             // Handle play mode for the first song (the tapped song) - seek after starting playback
             switch playMode {
@@ -267,6 +284,9 @@ struct ContentView: View {
             // Update last played at for the tapped song
             markedSong.lastPlayedAt = Date()
             try? modelContext.save()
+        } catch is CancellationError {
+            // Task was cancelled - this is expected when user taps another song quickly
+            print("Play song task was cancelled")
         } catch {
             print("Failed to play song: \(error.localizedDescription)")
         }

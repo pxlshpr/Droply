@@ -47,6 +47,9 @@ class MusicKitService: ObservableObject {
     private var pendingSongGraceTask: Task<Void, Never>?
     private let pendingSongGracePeriod: TimeInterval = 3.0 // 3 seconds grace period
 
+    // Track current play operation to allow cancellation
+    private var currentPlayTask: Task<Void, Error>?
+
     private init() {
         logger.info("MusicKitService initializing")
         setupObservers()
@@ -505,19 +508,66 @@ class MusicKitService: ObservableObject {
     // MARK: - Queue Management
 
     func playSong(_ song: Song) async throws {
+        // Cancel any existing play operation
+        if let existingTask = currentPlayTask {
+            logger.info("Cancelling existing play operation before starting new one")
+            existingTask.cancel()
+            currentPlayTask = nil
+        }
+
         logger.info("Setting up queue to play song: \(song.title) by \(song.artistName)")
 
         // Set pending song immediately for UI responsiveness
         setPendingSong(song)
 
-        player.queue = ApplicationMusicPlayer.Queue(for: [song], startingAt: song)
+        // Set loading state
+        isLoadingSong = true
+        loadingSongTitle = song.title
 
-        // Explicitly update currentSong immediately for UI responsiveness
-        currentSong = song
-        playbackDuration = song.duration ?? 0
+        // Create a new task for this play operation
+        let playTask = Task<Void, Error> { @MainActor in
+            // Check for cancellation before proceeding
+            try Task.checkCancellation()
 
-        logger.debug("Queue set, attempting to play")
-        try await play()
+            player.queue = ApplicationMusicPlayer.Queue(for: [song], startingAt: song)
+
+            // Explicitly update currentSong immediately for UI responsiveness
+            currentSong = song
+            playbackDuration = song.duration ?? 0
+
+            // Check for cancellation again before playing
+            try Task.checkCancellation()
+
+            logger.debug("Queue set, attempting to play")
+            try await play()
+        }
+
+        // Store the task so it can be cancelled if needed
+        currentPlayTask = playTask
+
+        // Await the task and handle cancellation
+        do {
+            try await playTask.value
+            // Clear the task reference on successful completion
+            if currentPlayTask == playTask {
+                currentPlayTask = nil
+            }
+        } catch is CancellationError {
+            logger.info("Play operation was cancelled")
+            // Clear loading state
+            isLoadingSong = false
+            loadingSongTitle = nil
+            throw CancellationError()
+        } catch {
+            // Clear the task reference on error
+            if currentPlayTask == playTask {
+                currentPlayTask = nil
+            }
+            // Clear loading state
+            isLoadingSong = false
+            loadingSongTitle = nil
+            throw error
+        }
     }
 
     func prepareToPlaySong(_ song: Song) async throws {
@@ -532,39 +582,145 @@ class MusicKitService: ObservableObject {
     }
 
     func playSongAtPosition(_ song: Song, startTime: TimeInterval) async throws {
+        // Cancel any existing play operation
+        if let existingTask = currentPlayTask {
+            logger.info("Cancelling existing play operation before starting new one")
+            existingTask.cancel()
+            currentPlayTask = nil
+        }
+
         logger.info("Setting up queue to play song: \(song.title) by \(song.artistName) at \(startTime)s")
 
         // Set pending song immediately for UI responsiveness
         setPendingSong(song)
 
-        player.queue = ApplicationMusicPlayer.Queue(for: [song], startingAt: song)
-        logger.debug("Queue set, attempting to play")
-        try await play()
-        await seek(to: startTime)
+        // Set loading state
+        isLoadingSong = true
+        loadingSongTitle = song.title
+
+        // Create a new task for this play operation
+        let playTask = Task<Void, Error> { @MainActor in
+            // Check for cancellation before proceeding
+            try Task.checkCancellation()
+
+            player.queue = ApplicationMusicPlayer.Queue(for: [song], startingAt: song)
+            logger.debug("Queue set, attempting to play")
+
+            // Check for cancellation again before playing
+            try Task.checkCancellation()
+
+            try await play()
+            await seek(to: startTime)
+        }
+
+        // Store the task so it can be cancelled if needed
+        currentPlayTask = playTask
+
+        // Await the task and handle cancellation
+        do {
+            try await playTask.value
+            // Clear the task reference on successful completion
+            if currentPlayTask == playTask {
+                currentPlayTask = nil
+            }
+        } catch is CancellationError {
+            logger.info("Play operation was cancelled")
+            // Clear loading state
+            isLoadingSong = false
+            loadingSongTitle = nil
+            throw CancellationError()
+        } catch {
+            // Clear the task reference on error
+            if currentPlayTask == playTask {
+                currentPlayTask = nil
+            }
+            // Clear loading state
+            isLoadingSong = false
+            loadingSongTitle = nil
+            throw error
+        }
     }
 
     func playSongWithQueueManager(_ song: Song) async throws {
+        // Cancel any existing play operation
+        if let existingTask = currentPlayTask {
+            logger.info("Cancelling existing play operation before starting new one")
+            existingTask.cancel()
+            currentPlayTask = nil
+        }
+
         logger.info("Playing song with queue manager: \(song.title) by \(song.artistName)")
 
         // Set pending song immediately for UI responsiveness
         setPendingSong(song)
 
-        // Convert to ItemToPlay and use queue manager
-        let item = ItemToPlay(song: song)
-        try await AppleMusicQueueManager.shared.play(item)
+        // Set loading state
+        isLoadingSong = true
+        loadingSongTitle = song.title
 
-        // Update current song immediately for UI responsiveness
-        currentSong = song
-        playbackDuration = song.duration ?? 0
-        isPlaying = true
+        // Create a new task for this play operation
+        let playTask = Task<Void, Error> { @MainActor in
+            // Check for cancellation before proceeding
+            try Task.checkCancellation()
 
-        logger.info("Queue manager started playing song")
+            // Convert to ItemToPlay and use queue manager
+            let item = ItemToPlay(song: song)
+
+            // Check for cancellation again before making the call
+            try Task.checkCancellation()
+
+            try await AppleMusicQueueManager.shared.play(item)
+
+            // Check for cancellation before updating state
+            try Task.checkCancellation()
+
+            // Update current song immediately for UI responsiveness
+            currentSong = song
+            playbackDuration = song.duration ?? 0
+            isPlaying = true
+
+            logger.info("Queue manager started playing song")
+        }
+
+        // Store the task so it can be cancelled if needed
+        currentPlayTask = playTask
+
+        // Await the task and handle cancellation
+        do {
+            try await playTask.value
+            // Clear the task reference on successful completion
+            if currentPlayTask == playTask {
+                currentPlayTask = nil
+            }
+        } catch is CancellationError {
+            logger.info("Play operation was cancelled")
+            // Clear loading state
+            isLoadingSong = false
+            loadingSongTitle = nil
+            throw CancellationError()
+        } catch {
+            // Clear the task reference on error
+            if currentPlayTask == playTask {
+                currentPlayTask = nil
+            }
+            // Clear loading state
+            isLoadingSong = false
+            loadingSongTitle = nil
+            throw error
+        }
     }
 
     func playSongsWithQueueManager(_ songs: [Song]) async throws {
         guard !songs.isEmpty else {
             logger.warning("Attempted to play empty song list")
             throw MusicKitError.notFound
+        }
+
+        // Cancel any existing play operation
+        if let existingTask = currentPlayTask {
+            logger.info("Cancelling existing play operation before starting new one")
+            existingTask.cancel()
+            currentPlayTask = nil
         }
 
         logger.info("Playing \(songs.count) songs with queue manager")
@@ -577,16 +733,56 @@ class MusicKitService: ObservableObject {
         isLoadingSong = true
         loadingSongTitle = firstSong.title
 
-        // Convert to ItemToPlay array and use queue manager
-        let items = songs.map { ItemToPlay(song: $0) }
-        try await AppleMusicQueueManager.shared.play(items)
+        // Create a new task for this play operation
+        let playTask = Task<Void, Error> { @MainActor in
+            // Check for cancellation before proceeding
+            try Task.checkCancellation()
 
-        // Update current song immediately for UI responsiveness (first song in list)
-        currentSong = firstSong
-        playbackDuration = firstSong.duration ?? 0
-        isPlaying = true
+            // Convert to ItemToPlay array and use queue manager
+            let items = songs.map { ItemToPlay(song: $0) }
 
-        logger.info("Queue manager started playing songs")
+            // Check for cancellation again before making the call
+            try Task.checkCancellation()
+
+            try await AppleMusicQueueManager.shared.play(items)
+
+            // Check for cancellation before updating state
+            try Task.checkCancellation()
+
+            // Update current song immediately for UI responsiveness (first song in list)
+            currentSong = firstSong
+            playbackDuration = firstSong.duration ?? 0
+            isPlaying = true
+
+            logger.info("Queue manager started playing songs")
+        }
+
+        // Store the task so it can be cancelled if needed
+        currentPlayTask = playTask
+
+        // Await the task and handle cancellation
+        do {
+            try await playTask.value
+            // Clear the task reference on successful completion
+            if currentPlayTask == playTask {
+                currentPlayTask = nil
+            }
+        } catch is CancellationError {
+            logger.info("Play operation was cancelled")
+            // Clear loading state
+            isLoadingSong = false
+            loadingSongTitle = nil
+            throw CancellationError()
+        } catch {
+            // Clear the task reference on error
+            if currentPlayTask == playTask {
+                currentPlayTask = nil
+            }
+            // Clear loading state
+            isLoadingSong = false
+            loadingSongTitle = nil
+            throw error
+        }
     }
 
     // MARK: - Search
