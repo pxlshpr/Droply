@@ -24,8 +24,6 @@ struct RecentlyMarkedView: View {
         order: .reverse
     ) private var recentlyMarkedSongs: [MarkedSong]
 
-    @State private var isLoading = false
-    @State private var errorMessage: String?
     @AppStorage("recentlyMarkedPlayMode") private var playMode: PlayMode = .cueAtFirstMarker
 
     enum PlayMode: String {
@@ -140,43 +138,16 @@ struct RecentlyMarkedView: View {
                 }
             }
 //            .toolbarBackground(.visible, for: .bottomBar)
-            .overlay {
-                if isLoading {
-                    ZStack {
-                        Color.black.opacity(0.3)
-                            .ignoresSafeArea()
-
-                        ProgressView()
-                            .progressViewStyle(.circular)
-                            .tint(.white)
-                            .scaleEffect(1.2)
-                            .padding()
-                            .background(.ultraThinMaterial)
-                            .cornerRadius(12)
-                    }
-                }
-            }
-            .alert("Error", isPresented: .constant(errorMessage != nil)) {
-                Button("OK") {
-                    errorMessage = nil
-                }
-            } message: {
-                if let errorMessage {
-                    Text(errorMessage)
-                }
-            }
         }
     }
 
     private func playSong(_ markedSong: MarkedSong) async {
-        isLoading = true
-        errorMessage = nil
+        // Dismiss immediately for responsive feel
+        dismiss()
 
         do {
             // Find the index of the tapped song
             guard let tappedIndex = recentlyMarkedSongs.firstIndex(where: { $0.id == markedSong.id }) else {
-                errorMessage = "Could not find song in recently marked list"
-                isLoading = false
                 return
             }
 
@@ -204,8 +175,6 @@ struct RecentlyMarkedView: View {
             }
 
             guard !songs.isEmpty else {
-                errorMessage = "Could not find any songs in Apple Music"
-                isLoading = false
                 return
             }
 
@@ -231,19 +200,14 @@ struct RecentlyMarkedView: View {
             // Update last played at for the tapped song
             markedSong.lastPlayedAt = Date()
             try? modelContext.save()
-
-            // Dismiss the view after starting playback
-            dismiss()
         } catch {
-            errorMessage = "Failed to play song: \(error.localizedDescription)"
+            print("Failed to play song: \(error.localizedDescription)")
         }
-
-        isLoading = false
     }
 
     private func playAllSongs() async {
-        isLoading = true
-        errorMessage = nil
+        // Dismiss immediately for responsive feel
+        dismiss()
 
         do {
             // Fetch all songs from MusicKit
@@ -259,13 +223,11 @@ struct RecentlyMarkedView: View {
                 if let song = response.items.first {
                     songs.append(song)
                 } else {
-                    errorMessage = "Could not find song '\(markedSong.title)' in Apple Music"
+                    print("Warning: Could not find song '\(markedSong.title)' in Apple Music")
                 }
             }
 
             guard !songs.isEmpty else {
-                errorMessage = "No songs available to play"
-                isLoading = false
                 return
             }
 
@@ -293,14 +255,9 @@ struct RecentlyMarkedView: View {
                 markedSong.lastPlayedAt = Date()
             }
             try? modelContext.save()
-
-            // Dismiss the view after starting playback
-            dismiss()
         } catch {
-            errorMessage = "Failed to play songs: \(error.localizedDescription)"
+            print("Failed to play songs: \(error.localizedDescription)")
         }
-
-        isLoading = false
     }
 
     private func timePeriod(for date: Date, relativeTo now: Date) -> String {

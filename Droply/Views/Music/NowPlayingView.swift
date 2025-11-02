@@ -756,56 +756,28 @@ struct NowPlayingView: View {
     }
 
     private var cueTimeSelector: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(cueTimeOptions, id: \.self) { cueTime in
-                    Button {
-                        let generator = UISelectionFeedbackGenerator()
-                        generator.selectionChanged()
-                        defaultCueTime = cueTime
-                    } label: {
-                        Text(formatCueTime(cueTime))
-                            .font(.subheadline)
-                            .fontWeight(defaultCueTime == cueTime ? .bold : .medium)
-                            .foregroundStyle(defaultCueTime == cueTime ? .white : .primary)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .background(defaultCueTime == cueTime ? .blue : Color(.systemGray5))
-                            .cornerRadius(16)
-                            .scaleEffect(defaultCueTime == cueTime ? 1.05 : 1.0)
-                            .shadow(color: defaultCueTime == cueTime ? .blue.opacity(0.3) : .clear, radius: 8)
-                    }
-                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: defaultCueTime)
-                }
+        Picker("Buffer Time", selection: $defaultCueTime) {
+            ForEach(cueTimeOptions, id: \.self) { cueTime in
+                Text(formatCueTime(cueTime)).tag(cueTime)
             }
-            .padding(.horizontal, 24)
+        }
+        .pickerStyle(.segmented)
+        .onChange(of: defaultCueTime) { _, _ in
+            let generator = UISelectionFeedbackGenerator()
+            generator.selectionChanged()
         }
     }
 
     private var loopDurationSelector: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(cueTimeOptions, id: \.self) { duration in
-                    Button {
-                        let generator = UISelectionFeedbackGenerator()
-                        generator.selectionChanged()
-                        loopDuration = duration
-                    } label: {
-                        Text(formatCueTime(duration))
-                            .font(.subheadline)
-                            .fontWeight(loopDuration == duration ? .bold : .medium)
-                            .foregroundStyle(loopDuration == duration ? .white : .primary)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .background(loopDuration == duration ? .blue : Color(.systemGray5))
-                            .cornerRadius(16)
-                            .scaleEffect(loopDuration == duration ? 1.05 : 1.0)
-                            .shadow(color: loopDuration == duration ? .blue.opacity(0.3) : .clear, radius: 8)
-                    }
-                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: loopDuration)
-                }
+        Picker("Loop Duration", selection: $loopDuration) {
+            ForEach(cueTimeOptions.filter { $0 > 0 }, id: \.self) { duration in
+                Text(formatCueTime(duration)).tag(duration)
             }
-            .padding(.horizontal, 24)
+        }
+        .pickerStyle(.segmented)
+        .onChange(of: loopDuration) { _, _ in
+            let generator = UISelectionFeedbackGenerator()
+            generator.selectionChanged()
         }
     }
 
