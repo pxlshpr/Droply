@@ -108,6 +108,8 @@ struct HorizontalMarkerStrip: View {
                             onDelete: onMarkerDelete
                         )
                         .onTapGesture {
+                            let generator = UIImpactFeedbackGenerator(style: .medium)
+                            generator.impactOccurred()
                             onTap(marker)
                         }
                     }

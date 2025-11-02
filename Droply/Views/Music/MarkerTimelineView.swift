@@ -87,6 +87,8 @@ struct MarkerTimelineView: View {
                         .frame(width: 32, height: 32)
                 )
                 .onTapGesture {
+                    let generator = UIImpactFeedbackGenerator(style: .medium)
+                    generator.impactOccurred()
                     onMarkerTap(marker)
                 }
                 .contextMenu {

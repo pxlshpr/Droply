@@ -19,7 +19,11 @@ struct CueMarkerVisualization: View {
     @State private var shimmerOffset: CGFloat = -1
 
     var body: some View {
-        Button(action: onTap) {
+        Button(action: {
+            let generator = UIImpactFeedbackGenerator(style: .medium)
+            generator.impactOccurred()
+            onTap()
+        }) {
             HStack(spacing: 6) {
                 Text(marker.emoji)
                     .font(.body)
@@ -182,6 +186,8 @@ struct HorizontalMarkerStripWithAutoScroll: View {
                                     onDelete: onMarkerDelete
                                 )
                                 .onTapGesture {
+                                    let generator = UIImpactFeedbackGenerator(style: .medium)
+                                    generator.impactOccurred()
                                     onTap(marker)
                                 }
                                 .id(marker.id)

@@ -210,6 +210,8 @@ struct NowPlayingView: View {
                         HStack(spacing: 0) {
                             // Previous marker button
                             Button {
+                                let generator = UISelectionFeedbackGenerator()
+                                generator.selectionChanged()
                                 navigateToPreviousMarker()
                             } label: {
                                 Image(systemName: "chevron.backward.2")
@@ -223,6 +225,8 @@ struct NowPlayingView: View {
 
                             // Previous track button
                             Button {
+                                let generator = UISelectionFeedbackGenerator()
+                                generator.selectionChanged()
                                 Task {
                                     try? await musicService.skipToPreviousItem()
                                 }
@@ -238,6 +242,8 @@ struct NowPlayingView: View {
 
                             // Play/Pause button
                             Button {
+                                let generator = UISelectionFeedbackGenerator()
+                                generator.selectionChanged()
                                 Task {
                                     try? await musicService.togglePlayPause()
                                 }
@@ -253,6 +259,8 @@ struct NowPlayingView: View {
 
                             // Next track button
                             Button {
+                                let generator = UISelectionFeedbackGenerator()
+                                generator.selectionChanged()
                                 Task {
                                     try? await musicService.skipToNextItem()
                                 }
@@ -268,6 +276,8 @@ struct NowPlayingView: View {
 
                             // Next marker button
                             Button {
+                                let generator = UISelectionFeedbackGenerator()
+                                generator.selectionChanged()
                                 navigateToNextMarker()
                             } label: {
                                 Image(systemName: "chevron.forward.2")
@@ -671,6 +681,10 @@ struct NowPlayingView: View {
                                         .foregroundStyle(.secondary)
                                 }
                             }
+                            .onChange(of: loopModeEnabled) { _, _ in
+                                let generator = UISelectionFeedbackGenerator()
+                                generator.selectionChanged()
+                            }
 
                             if loopModeEnabled {
                                 VStack(alignment: .leading, spacing: 8) {
@@ -746,6 +760,8 @@ struct NowPlayingView: View {
             HStack(spacing: 8) {
                 ForEach(cueTimeOptions, id: \.self) { cueTime in
                     Button {
+                        let generator = UISelectionFeedbackGenerator()
+                        generator.selectionChanged()
                         defaultCueTime = cueTime
                     } label: {
                         Text(formatCueTime(cueTime))
@@ -771,6 +787,8 @@ struct NowPlayingView: View {
             HStack(spacing: 8) {
                 ForEach(cueTimeOptions, id: \.self) { duration in
                     Button {
+                        let generator = UISelectionFeedbackGenerator()
+                        generator.selectionChanged()
                         loopDuration = duration
                     } label: {
                         Text(formatCueTime(duration))
