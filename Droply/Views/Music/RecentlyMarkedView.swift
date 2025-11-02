@@ -56,49 +56,68 @@ struct RecentlyMarkedView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if recentlyMarkedSongs.isEmpty {
-                    ContentUnavailableView(
-                        "No Marked Songs",
-                        systemImage: "music.note.list",
-                        description: Text("Songs you mark will appear here")
-                    )
-                } else {
-                    List {
-                        ForEach(groupedSongs, id: \.period) { group in
-                            Section(header: Text(group.period)) {
-                                ForEach(group.songs) { song in
-                                    RecentlyMarkedRow(song: song)
-                                        .contentShape(Rectangle())
-                                        .onTapGesture {
-                                            // Play delightful haptic feedback
-                                            HapticManager.shared.playMusicalPing()
+            ZStack {
+                // Dynamic background gradient
+                LinearGradient(
+                    colors: [musicService.backgroundColor1, musicService.backgroundColor2],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+                .animation(.easeInOut(duration: 0.8), value: musicService.backgroundColor1)
+                .animation(.easeInOut(duration: 0.8), value: musicService.backgroundColor2)
 
-                                            // Cancel any existing play task
-                                            currentPlayTask?.cancel()
+                Group {
+                    if recentlyMarkedSongs.isEmpty {
+                        ContentUnavailableView(
+                            "No Marked Songs",
+                            systemImage: "music.note.list",
+                            description: Text("Songs you mark will appear here")
+                        )
+                        .foregroundStyle(.white)
+                    } else {
+                        List {
+                            ForEach(groupedSongs, id: \.period) { group in
+                                Section(header: Text(group.period).foregroundStyle(.white)) {
+                                    ForEach(group.songs) { song in
+                                        RecentlyMarkedRow(song: song)
+                                            .contentShape(Rectangle())
+                                            .onTapGesture {
+                                                // Play delightful haptic feedback
+                                                HapticManager.shared.playMusicalPing()
 
-                                            // Create new play task
-                                            currentPlayTask = Task {
-                                                await playSong(song)
+                                                // Cancel any existing play task
+                                                currentPlayTask?.cancel()
+
+                                                // Create new play task
+                                                currentPlayTask = Task {
+                                                    await playSong(song)
+                                                }
                                             }
-                                        }
+                                    }
                                 }
                             }
                         }
+                        .listStyle(.plain)
+                        .scrollContentBackground(.hidden)
                     }
-                    .listStyle(.plain)
                 }
             }
-            .navigationTitle("Recently Marked")
-            .navigationBarTitleDisplayMode(.inline)
+            .toolbarColorScheme(.dark)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("Droply")
+                        .font(.system(size: 28, weight: .heavy, design: .rounded))
+                        .foregroundStyle(.white)
+                }
+
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         dismiss()
                     } label: {
                         Image(systemName: "xmark")
                             .font(.body)
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(.white)
                     }
                 }
 
@@ -122,6 +141,7 @@ struct RecentlyMarkedView: View {
                             Text(playMode == .startOfSong ? "Start" : "Drop in")
                                 .font(.subheadline)
                         }
+                        .foregroundStyle(.white)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
                         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
@@ -324,7 +344,7 @@ struct RecentlyMarkedRow: View {
                         .fill(.ultraThinMaterial)
                         .overlay {
                             Image(systemName: "music.note")
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(.white.opacity(0.5))
                         }
                 }
                 .frame(width: 44, height: 44)
@@ -334,7 +354,7 @@ struct RecentlyMarkedRow: View {
                     .fill(.ultraThinMaterial)
                     .overlay {
                         Image(systemName: "music.note")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.white.opacity(0.5))
                             .font(.caption)
                     }
                     .frame(width: 44, height: 44)
@@ -345,11 +365,12 @@ struct RecentlyMarkedRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(song.title)
                     .font(.subheadline)
+                    .foregroundStyle(.white)
                     .lineLimit(1)
 
                 Text(song.artist)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.7))
                     .lineLimit(1)
             }
 
@@ -371,7 +392,7 @@ struct SongMarkerPreview: View {
         ZStack(alignment: .leading) {
             // Background capsule representing song length
             Capsule()
-                .fill(.tertiary.opacity(0.3))
+                .fill(.white.opacity(0.2))
                 .frame(width: timelineWidth, height: capsuleHeight)
                 .padding(.horizontal, 1)
                 .padding(.vertical, 1)

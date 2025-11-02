@@ -49,13 +49,25 @@ class HapticManager {
     /// Creates a bouncy, musical feel like plucking a string
     func playMusicalPing() {
         guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else {
+            print("Device doesn't support haptics, using fallback")
             // Fallback to basic haptic on unsupported devices
             let generator = UIImpactFeedbackGenerator(style: .medium)
             generator.impactOccurred()
             return
         }
 
+        // Ensure engine exists and is running
+        guard let engine = engine else {
+            print("Haptic engine not initialized, using fallback")
+            let generator = UIImpactFeedbackGenerator(style: .medium)
+            generator.impactOccurred()
+            return
+        }
+
         do {
+            // Restart engine if it's not running
+            try engine.start()
+
             // First tap - sharp and strong (like striking a note)
             let strongTap = CHHapticEvent(
                 eventType: .hapticTransient,
@@ -77,8 +89,10 @@ class HapticManager {
             )
 
             let pattern = try CHHapticPattern(events: [strongTap, echoTap], parameters: [])
-            let player = try engine?.makePlayer(with: pattern)
-            try player?.start(atTime: CHHapticTimeImmediate)
+            let player = try engine.makePlayer(with: pattern)
+            try player.start(atTime: CHHapticTimeImmediate)
+
+            print("Musical ping haptic played successfully")
         } catch {
             print("Failed to play haptic pattern: \(error)")
             // Fallback to basic haptic
