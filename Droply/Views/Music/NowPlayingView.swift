@@ -22,10 +22,6 @@ struct NowPlayingView: View {
     @State private var settingsDetent: PresentationDetent = .medium
     @State private var markerToEdit: SongMarker?
     @State private var selectedMarker: SongMarker?
-    @State private var backgroundColor1: Color = .purple.opacity(0.3)
-    @State private var backgroundColor2: Color = .blue.opacity(0.3)
-    @State private var meshColors: [Color]? // Colors for mesh gradient visualizations
-    @State private var backgroundMeshColors: [Color]? // Colors for background mesh gradient
     @AppStorage("defaultCueTime") private var defaultCueTime: Double = 5.0
     @AppStorage("loopModeEnabled") private var loopModeEnabled: Bool = false
     @AppStorage("loopDuration") private var loopDuration: Double = 10.0
@@ -64,13 +60,13 @@ struct NowPlayingView: View {
                 ZStack {
                     // Dynamic background gradient from artwork colors
                     LinearGradient(
-                        colors: isPreview ? [Color(white: 0.1), Color(white: 0.15)] : [backgroundColor1, backgroundColor2],
+                        colors: isPreview ? [Color(white: 0.1), Color(white: 0.15)] : [musicService.backgroundColor1, musicService.backgroundColor2],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                     .ignoresSafeArea()
-                    .animation(.easeInOut(duration: 0.8), value: backgroundColor1)
-                    .animation(.easeInOut(duration: 0.8), value: backgroundColor2)
+                    .animation(.easeInOut(duration: 0.8), value: musicService.backgroundColor1)
+                    .animation(.easeInOut(duration: 0.8), value: musicService.backgroundColor2)
 
                 VStack(spacing: 0) {
                 if musicService.isCheckingPlayback && !isPreview {
@@ -191,7 +187,7 @@ struct NowPlayingView: View {
                                     .contentTransition(.numericText())
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 8)
-                                    .glassEffect(.regular.tint(backgroundColor1).interactive())
+                                    .glassEffect(.regular.tint(musicService.backgroundColor1).interactive())
                             }
 
                             Text("/")
@@ -321,7 +317,7 @@ struct NowPlayingView: View {
                                 onMarkerDelete: { marker in
                                     deleteMarker(marker)
                                 },
-                                meshColors: meshColors
+                                meshColors: musicService.meshColors
                             )
                             .frame(maxWidth: availableWidth)
                         } else {
@@ -368,7 +364,7 @@ struct NowPlayingView: View {
                                 onTap: {
                                     showingCueTimeSelector = true
                                 },
-                                meshColors: meshColors,
+                                meshColors: musicService.meshColors,
                                 loopEnabled: loopModeEnabled,
                                 loopDuration: loopDuration
                             )
@@ -458,7 +454,7 @@ struct NowPlayingView: View {
                                     .foregroundStyle(.white)
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 8)
-                                    .glassEffect(.regular.tint(backgroundColor1).interactive())
+                                    .glassEffect(.regular.tint(musicService.backgroundColor1).interactive())
                             }
 
                             Text("/")
@@ -570,7 +566,7 @@ struct NowPlayingView: View {
                                 onTap: {
                                     showingCueTimeSelector = true
                                 },
-                                meshColors: meshColors,
+                                meshColors: musicService.meshColors,
                                 loopEnabled: loopModeEnabled,
                                 loopDuration: loopDuration
                             )
@@ -710,12 +706,10 @@ struct NowPlayingView: View {
             }
             .onChange(of: musicService.currentSong) { _, newSong in
                 updateMarkedSong(for: newSong)
-                extractColorsFromArtwork(for: newSong)
             }
             .onAppear {
                 migrateLegacySongs()
                 updateMarkedSong(for: musicService.currentSong)
-                extractColorsFromArtwork(for: musicService.currentSong)
                 cueManager.setup(musicService: musicService)
             }
             .fullScreenCover(isPresented: $cueManager.showFullscreenVisualization) {
@@ -727,7 +721,7 @@ struct NowPlayingView: View {
                         onDismiss: {
                             cueManager.showFullscreenVisualization = false
                         },
-                        meshColors: meshColors
+                        meshColors: musicService.meshColors
                     )
                 }
             }
@@ -810,11 +804,14 @@ struct NowPlayingView: View {
             // No previous marker found in current song - try to skip to previous song
             Task {
                 do {
+                    // Pause first to prevent any playback before we're ready
+                    try? await musicService.pause()
+
                     // Try to skip to the previous song in the queue
                     try await musicService.skipToPreviousItem()
 
                     // Wait for the song to change and playback to initialize
-                    try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+                    try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
 
                     // Check if the new song has markers
                     if let currentSong = musicService.currentSong,
@@ -824,8 +821,10 @@ struct NowPlayingView: View {
                         let startTime = max(0, lastMarker.timestamp - defaultCueTime)
                         await musicService.seek(to: startTime)
                         try? await musicService.play()
+                    } else {
+                        // If no markers, play from the beginning
+                        try? await musicService.play()
                     }
-                    // If no markers, just let it play from the beginning
                 } catch {
                     // If skipping fails (no previous song), trigger error haptic
                     let generator = UINotificationFeedbackGenerator()
@@ -846,11 +845,11 @@ struct NowPlayingView: View {
             // No next marker found in current song - try to skip to next song
             Task {
                 do {
+                    // Pause first to prevent any playback before we're ready
+                    try? await musicService.pause()
+
                     // Try to skip to the next song in the queue
                     try await musicService.skipToNextItem()
-
-                    // Pause immediately to prevent playing from the start
-                    try? await musicService.pause()
 
                     // Wait for the song to change and playback to initialize
                     try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
@@ -949,62 +948,6 @@ struct NowPlayingView: View {
         }
 
         try? modelContext.save()
-    }
-
-    private func extractColorsFromArtwork(for song: Song?) {
-        guard let song = song,
-              let artwork = song.artwork,
-              let url = artwork.url(width: 300, height: 300) else {
-            // Reset to default colors if no artwork
-            withAnimation(.easeInOut(duration: 0.8)) {
-                backgroundColor1 = .purple.opacity(0.3)
-                backgroundColor2 = .blue.opacity(0.3)
-                meshColors = nil
-                backgroundMeshColors = nil
-            }
-            return
-        }
-
-        Task {
-            do {
-                // Download the artwork image
-                let (data, _) = try await URLSession.shared.data(from: url)
-                guard let image = UIImage(data: data) else { return }
-
-                // Extract comprehensive color palette
-                if let palette = await ColorExtractor.extractColorPalette(from: image) {
-                    await MainActor.run {
-                        withAnimation(.easeInOut(duration: 0.8)) {
-                            // Update background colors (using darkened colors)
-                            backgroundColor1 = Color(uiColor: palette.backgroundColors.color1)
-                            backgroundColor2 = Color(uiColor: palette.backgroundColors.color2)
-
-                            // Update mesh colors for visualizations (using vibrant colors)
-                            meshColors = palette.vibrantMeshColors.map { Color(uiColor: $0) }
-
-                            // Update background mesh colors (using base mesh colors, darkened)
-                            backgroundMeshColors = palette.meshColors.map {
-                                Color(uiColor: $0)
-                                    .opacity(0.3)
-                            }
-                        }
-                    }
-                } else {
-                    // Fallback to old method if palette extraction fails
-                    if let colors = await ColorExtractor.extractColors(from: image) {
-                        await MainActor.run {
-                            withAnimation(.easeInOut(duration: 0.8)) {
-                                backgroundColor1 = Color(uiColor: colors.color1)
-                                backgroundColor2 = Color(uiColor: colors.color2)
-                            }
-                        }
-                    }
-                }
-            } catch {
-                // If extraction fails, keep current colors
-                print("Failed to extract colors from artwork: \(error)")
-            }
-        }
     }
 }
 

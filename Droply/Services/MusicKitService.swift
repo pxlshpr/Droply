@@ -10,6 +10,7 @@ import MusicKit
 import Combine
 import OSLog
 import MediaPlayer
+import SwiftUI
 
 @MainActor
 class MusicKitService: ObservableObject {
@@ -24,6 +25,14 @@ class MusicKitService: ObservableObject {
     @Published var playbackDuration: TimeInterval = 0
     @Published var isDragging: Bool = false
     @Published var isCheckingPlayback: Bool = true
+    @Published var isLoadingSong: Bool = false
+    @Published var loadingSongTitle: String?
+
+    // Pre-extracted artwork colors
+    @Published var backgroundColor1: Color = .purple.opacity(0.3)
+    @Published var backgroundColor2: Color = .blue.opacity(0.3)
+    @Published var meshColors: [Color]?
+    @Published var backgroundMeshColors: [Color]?
 
     private let player = ApplicationMusicPlayer.shared
     private let systemPlayer = MPMusicPlayerController.systemMusicPlayer
@@ -38,6 +47,15 @@ class MusicKitService: ObservableObject {
         Task {
             await updateAuthorizationStatus()
         }
+
+        // Observe currentSong changes to extract colors
+        $currentSong
+            .sink { [weak self] song in
+                Task { @MainActor [weak self] in
+                    await self?.extractColorsFromArtwork(for: song)
+                }
+            }
+            .store(in: &cancellables)
     }
 
     // MARK: - Authorization
@@ -174,6 +192,13 @@ class MusicKitService: ObservableObject {
 
         logger.info("System player now playing: \(mediaItem.title ?? "Unknown") by \(mediaItem.artist ?? "Unknown")")
 
+        // Clear loading state when playback starts
+        if isLoadingSong && playbackState == .playing {
+            isLoadingSong = false
+            loadingSongTitle = nil
+            logger.debug("Cleared loading state - system player is now playing")
+        }
+
         // Try to convert MPMediaItem to MusicKit Song
         Task {
             await convertMediaItemToSong(mediaItem)
@@ -239,6 +264,13 @@ class MusicKitService: ObservableObject {
                 currentSong = song
                 playbackDuration = song.duration ?? 0
                 logger.info("Current song updated from app player: \(song.title) by \(song.artistName) (ID: \(song.id.rawValue))")
+
+                // Clear loading state when song is confirmed to be playing
+                if isLoadingSong && playbackStatus == .playing {
+                    isLoadingSong = false
+                    loadingSongTitle = nil
+                    logger.debug("Cleared loading state - song is now playing")
+                }
             } else {
                 logger.warning("Current queue entry is not a song, type: \(String(describing: nowPlayingEntry.item))")
             }
@@ -287,9 +319,18 @@ class MusicKitService: ObservableObject {
         }
     }
 
-    func pause() {
+    func pause() async throws {
         logger.info("Pausing playback")
-        player.pause()
+
+        // Determine which player is active and pause the correct one
+        if systemPlayer.playbackState == .playing || systemPlayer.nowPlayingItem != nil {
+            logger.debug("Pausing system player")
+            systemPlayer.pause()
+        } else {
+            logger.debug("Pausing app player")
+            player.pause()
+        }
+
         isPlaying = false
     }
 
@@ -311,7 +352,7 @@ class MusicKitService: ObservableObject {
             // Use app player for play/pause
             logger.debug("Toggling play/pause on app player")
             if isPlaying {
-                pause()
+                try await pause()
             } else {
                 try await play()
             }
@@ -471,12 +512,16 @@ class MusicKitService: ObservableObject {
 
         logger.info("Playing \(songs.count) songs with queue manager")
 
+        // Set loading state
+        let firstSong = songs[0]
+        isLoadingSong = true
+        loadingSongTitle = firstSong.title
+
         // Convert to ItemToPlay array and use queue manager
         let items = songs.map { ItemToPlay(song: $0) }
         try await AppleMusicQueueManager.shared.play(items)
 
         // Update current song immediately for UI responsiveness (first song in list)
-        let firstSong = songs[0]
         currentSong = firstSong
         playbackDuration = firstSong.duration ?? 0
         isPlaying = true
@@ -534,6 +579,52 @@ class MusicKitService: ObservableObject {
         logger.info("Playback time: \(self.playbackTime)")
         logger.info("Playback duration: \(self.playbackDuration)")
         logger.info("=========================")
+    }
+
+    // MARK: - Color Extraction
+
+    private func extractColorsFromArtwork(for song: Song?) async {
+        guard let song = song,
+              let artwork = song.artwork,
+              let url = artwork.url(width: 300, height: 300) else {
+            // Reset to default colors if no artwork
+            backgroundColor1 = .purple.opacity(0.3)
+            backgroundColor2 = .blue.opacity(0.3)
+            meshColors = nil
+            backgroundMeshColors = nil
+            return
+        }
+
+        do {
+            // Download the artwork image
+            let (data, _) = try await URLSession.shared.data(from: url)
+            guard let image = UIImage(data: data) else { return }
+
+            // Extract comprehensive color palette
+            if let palette = await ColorExtractor.extractColorPalette(from: image) {
+                // Update colors on main actor with animation
+                backgroundColor1 = Color(uiColor: palette.backgroundColors.color1)
+                backgroundColor2 = Color(uiColor: palette.backgroundColors.color2)
+
+                // Update mesh colors for visualizations (using vibrant colors)
+                meshColors = palette.vibrantMeshColors.map { Color(uiColor: $0) }
+
+                // Update background mesh colors (using base mesh colors, darkened)
+                backgroundMeshColors = palette.meshColors.map {
+                    Color(uiColor: $0)
+                        .opacity(0.3)
+                }
+            } else {
+                // Fallback to old method if palette extraction fails
+                if let colors = await ColorExtractor.extractColors(from: image) {
+                    backgroundColor1 = Color(uiColor: colors.color1)
+                    backgroundColor2 = Color(uiColor: colors.color2)
+                }
+            }
+        } catch {
+            // If extraction fails, keep current colors
+            logger.error("Failed to extract colors from artwork: \(error.localizedDescription)")
+        }
     }
 }
 

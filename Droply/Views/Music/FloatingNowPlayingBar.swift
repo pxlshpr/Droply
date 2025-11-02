@@ -22,10 +22,12 @@ struct FloatingNowPlayingBar: View {
     }
 
     var body: some View {
-        if let song = musicService.currentSong {
-            HStack(spacing: 12) {
-                // Artwork
-                Group {
+        HStack(spacing: 12) {
+            // Artwork - show pulsating gradient when loading, or nothing playing icon
+            Group {
+                if musicService.isLoadingSong {
+                    PulsatingGradientView()
+                } else if let song = musicService.currentSong {
                     if let artwork = song.artwork {
                         ArtworkImage(artwork, width: 50, height: 50)
                     } else {
@@ -37,11 +39,22 @@ struct FloatingNowPlayingBar: View {
                                     .font(.caption)
                             }
                     }
+                } else {
+                    // Nothing playing state
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(.ultraThinMaterial)
+                        .overlay {
+                            Image(systemName: "music.note.slash")
+                                .foregroundStyle(.secondary)
+                                .font(.caption)
+                        }
                 }
-                .frame(width: 50, height: 50)
-                .cornerRadius(6)
+            }
+            .frame(width: 50, height: 50)
+            .cornerRadius(6)
 
-                // Song info with marquee
+            // Song info with marquee or "Nothing Playing"
+            if let song = musicService.currentSong {
                 VStack(alignment: .leading, spacing: 2) {
                     MarqueeText(
                         text: song.title,
@@ -55,8 +68,22 @@ struct FloatingNowPlayingBar: View {
                         .lineLimit(1)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Nothing Playing")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(height: 18)
 
-                // Play/Pause button
+                    Text("Tap a song to get started")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            // Play/Pause button - only show when song is loaded
+            if musicService.currentSong != nil {
                 Button {
                     let generator = UISelectionFeedbackGenerator()
                     generator.selectionChanged()
@@ -86,13 +113,16 @@ struct FloatingNowPlayingBar: View {
                 .opacity(currentMarkedSong?.sortedMarkers.isEmpty == false ? 1 : 0.3)
                 .disabled(currentMarkedSong?.sortedMarkers.isEmpty != false)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(.ultraThinMaterial)
-            .cornerRadius(12)
-            .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
-            .contentShape(Rectangle())
-            .onTapGesture {
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.ultraThinMaterial)
+        .cornerRadius(12)
+        .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            // Only allow tapping to view now playing if song is loaded
+            if musicService.currentSong != nil {
                 onTap()
             }
         }
@@ -119,11 +149,11 @@ struct FloatingNowPlayingBar: View {
             // No next marker found in current song - try to skip to next song
             Task {
                 do {
+                    // Pause first to prevent any playback before we're ready
+                    try? await musicService.pause()
+
                     // Try to skip to the next song in the queue
                     try await musicService.skipToNextItem()
-
-                    // Pause immediately to prevent playing from the start
-                    try? await musicService.pause()
 
                     // Wait for the song to change and playback to initialize
                     try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
@@ -147,6 +177,32 @@ struct FloatingNowPlayingBar: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Pulsating Gradient View
+
+struct PulsatingGradientView: View {
+    @State private var animationPhase: CGFloat = 0
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 6)
+            .fill(
+                LinearGradient(
+                    colors: [
+                        Color(white: 0.15).opacity(0.8 + animationPhase * 0.2),
+                        Color(white: 0.25).opacity(0.8 + animationPhase * 0.2),
+                        Color(white: 0.15).opacity(0.8 + animationPhase * 0.2)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .onAppear {
+                withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                    animationPhase = 1.0
+                }
+            }
     }
 }
 

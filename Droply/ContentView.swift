@@ -77,31 +77,112 @@ struct ContentView: View {
                         }
                         .listStyle(.plain)
                         .safeAreaInset(edge: .bottom) {
-                            // Add padding for the floating bar
-                            if musicService.currentSong != nil {
-                                Color.clear.frame(height: 80)
-                            }
+                            // Add padding for the floating bar (always visible)
+                            Color.clear.frame(height: 80)
                         }
                     }
                 }
 
-                // Floating now playing bar
-                if musicService.currentSong != nil {
-                    VStack {
-                        Spacer()
-                        FloatingNowPlayingBar {
-                            showingNowPlaying = true
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 12)
+                // Floating now playing bar (always visible)
+                VStack {
+                    Spacer()
+                    FloatingNowPlayingBar {
+                        showingNowPlaying = true
                     }
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 12)
                 }
             }
             .navigationTitle("Recently Marked")
             .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Menu {
+                        Button {
+                            playMode = .startOfSong
+                        } label: {
+                            Label("Start", systemImage: playMode == .startOfSong ? "checkmark" : "")
+                        }
+
+                        Button {
+                            playMode = .cueAtFirstMarker
+                        } label: {
+                            Label("Drop in at Marker", systemImage: playMode == .cueAtFirstMarker ? "checkmark" : "")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .font(.title3)
+                    }
+                }
+
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        Task {
+                            await playAllSongs()
+                        }
+                    } label: {
+                        Label("Play All", systemImage: "play.fill")
+                    }
+                    .disabled(recentlyMarkedSongs.isEmpty)
+                }
+            }
             .sheet(isPresented: $showingNowPlaying) {
                 NowPlayingView()
             }
+        }
+    }
+
+    // MARK: - Playback Methods
+
+    private func playAllSongs() async {
+        do {
+            // Fetch all songs from MusicKit
+            var songs: [Song] = []
+
+            for markedSong in recentlyMarkedSongs {
+                let request = MusicCatalogResourceRequest<Song>(
+                    matching: \.id,
+                    equalTo: MusicItemID(markedSong.appleMusicID)
+                )
+                let response = try await request.response()
+
+                if let song = response.items.first {
+                    songs.append(song)
+                } else {
+                    print("Warning: Could not find song '\(markedSong.title)' in Apple Music")
+                }
+            }
+
+            guard !songs.isEmpty else {
+                return
+            }
+
+            // Play all songs using the queue manager
+            try await musicService.playSongsWithQueueManager(songs)
+
+            // Wait a moment for playback to initialize before seeking
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+
+            // Handle play mode for the first song - seek after starting playback
+            switch playMode {
+            case .startOfSong:
+                // Already playing from beginning of first song
+                break
+            case .cueAtFirstMarker:
+                // Seek to first marker of the first song if available
+                if let firstMarker = recentlyMarkedSongs.first?.sortedMarkers.first {
+                    let startTime = max(0, firstMarker.timestamp - (firstMarker.cueTime))
+                    await musicService.seek(to: startTime)
+                }
+            }
+
+            // Update last played at for all songs
+            for markedSong in recentlyMarkedSongs {
+                markedSong.lastPlayedAt = Date()
+            }
+            try? modelContext.save()
+        } catch {
+            print("Failed to play songs: \(error.localizedDescription)")
         }
     }
 
