@@ -23,11 +23,11 @@ struct FloatingNowPlayingBar: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // Artwork - show pulsating gradient when loading, or nothing playing icon
+            // Artwork - show pulsating gradient when loading, pending song, or current song
             Group {
                 if musicService.isLoadingSong {
                     PulsatingGradientView()
-                } else if let song = musicService.currentSong {
+                } else if let song = musicService.currentSong ?? musicService.pendingSong {
                     if let artwork = song.artwork {
                         ArtworkImage(artwork, width: 50, height: 50)
                     } else {
@@ -54,7 +54,7 @@ struct FloatingNowPlayingBar: View {
             .cornerRadius(6)
 
             // Song info with marquee or "Nothing Playing"
-            if let song = musicService.currentSong {
+            if let song = musicService.currentSong ?? musicService.pendingSong {
                 VStack(alignment: .leading, spacing: 2) {
                     MarqueeText(
                         text: song.title,

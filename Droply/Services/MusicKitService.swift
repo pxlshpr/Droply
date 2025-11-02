@@ -28,6 +28,10 @@ class MusicKitService: ObservableObject {
     @Published var isLoadingSong: Bool = false
     @Published var loadingSongTitle: String?
 
+    // Pending song state - used to show the upcoming song immediately when tapped
+    // while waiting for actual playback to start
+    @Published var pendingSong: Song?
+
     // Pre-extracted artwork colors
     @Published var backgroundColor1: Color = .purple.opacity(0.3)
     @Published var backgroundColor2: Color = .blue.opacity(0.3)
@@ -40,6 +44,8 @@ class MusicKitService: ObservableObject {
     private var playbackTimer: Timer?
     private var isSeeking = false
     private var seekDebounceTask: Task<Void, Never>?
+    private var pendingSongGraceTask: Task<Void, Never>?
+    private let pendingSongGracePeriod: TimeInterval = 3.0 // 3 seconds grace period
 
     private init() {
         logger.info("MusicKitService initializing")
@@ -53,6 +59,11 @@ class MusicKitService: ObservableObject {
             .sink { [weak self] song in
                 Task { @MainActor [weak self] in
                     await self?.extractColorsFromArtwork(for: song)
+
+                    // Clear pending song when actual song starts playing
+                    if song != nil {
+                        self?.clearPendingSong()
+                    }
                 }
             }
             .store(in: &cancellables)
@@ -456,10 +467,49 @@ class MusicKitService: ObservableObject {
         playbackTime = time
     }
 
+    // MARK: - Pending Song Management
+
+    private func setPendingSong(_ song: Song) {
+        logger.debug("Setting pending song: \(song.title)")
+
+        // Cancel any existing grace period
+        pendingSongGraceTask?.cancel()
+
+        // Set the pending song
+        pendingSong = song
+
+        // Start grace period timer
+        pendingSongGraceTask = Task { @MainActor in
+            do {
+                try await Task.sleep(nanoseconds: UInt64(pendingSongGracePeriod * 1_000_000_000))
+
+                // If we reach here and the song still hasn't started playing, clear the pending state
+                if !Task.isCancelled && self.currentSong == nil {
+                    logger.warning("Grace period expired and song hasn't started playing - clearing pending song")
+                    self.clearPendingSong()
+                }
+            } catch {
+                // Task was cancelled, which is fine
+                logger.debug("Pending song grace period task cancelled")
+            }
+        }
+    }
+
+    private func clearPendingSong() {
+        logger.debug("Clearing pending song")
+        pendingSongGraceTask?.cancel()
+        pendingSongGraceTask = nil
+        pendingSong = nil
+    }
+
     // MARK: - Queue Management
 
     func playSong(_ song: Song) async throws {
         logger.info("Setting up queue to play song: \(song.title) by \(song.artistName)")
+
+        // Set pending song immediately for UI responsiveness
+        setPendingSong(song)
+
         player.queue = ApplicationMusicPlayer.Queue(for: [song], startingAt: song)
 
         // Explicitly update currentSong immediately for UI responsiveness
@@ -483,6 +533,10 @@ class MusicKitService: ObservableObject {
 
     func playSongAtPosition(_ song: Song, startTime: TimeInterval) async throws {
         logger.info("Setting up queue to play song: \(song.title) by \(song.artistName) at \(startTime)s")
+
+        // Set pending song immediately for UI responsiveness
+        setPendingSong(song)
+
         player.queue = ApplicationMusicPlayer.Queue(for: [song], startingAt: song)
         logger.debug("Queue set, attempting to play")
         try await play()
@@ -491,6 +545,9 @@ class MusicKitService: ObservableObject {
 
     func playSongWithQueueManager(_ song: Song) async throws {
         logger.info("Playing song with queue manager: \(song.title) by \(song.artistName)")
+
+        // Set pending song immediately for UI responsiveness
+        setPendingSong(song)
 
         // Convert to ItemToPlay and use queue manager
         let item = ItemToPlay(song: song)
@@ -512,8 +569,11 @@ class MusicKitService: ObservableObject {
 
         logger.info("Playing \(songs.count) songs with queue manager")
 
-        // Set loading state
+        // Set pending song immediately for UI responsiveness
         let firstSong = songs[0]
+        setPendingSong(firstSong)
+
+        // Set loading state
         isLoadingSong = true
         loadingSongTitle = firstSong.title
 

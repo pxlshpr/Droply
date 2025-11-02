@@ -82,7 +82,7 @@ struct NowPlayingView: View {
                             .foregroundStyle(.white.opacity(0.8))
                     }
                     .padding(.horizontal)
-                } else if let song = musicService.currentSong, !isPreview {
+                } else if let song = musicService.currentSong ?? musicService.pendingSong, !isPreview {
                     // Calculate available space accounting for safe areas
                     let bottomSafeArea = max(geometry.safeAreaInsets.bottom, 20) // Minimum 20pt padding
                     let availableHeight = geometry.size.height - bottomSafeArea
