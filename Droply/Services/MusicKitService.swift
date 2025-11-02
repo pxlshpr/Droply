@@ -265,13 +265,25 @@ class MusicKitService: ObservableObject {
 
     func play() async throws {
         logger.info("Attempting to play")
-        do {
-            try await player.play()
+
+        // Determine which player is active
+        if systemPlayer.playbackState != .stopped && (systemPlayer.playbackState == .playing || systemPlayer.nowPlayingItem != nil) {
+            // Use system player for play
+            logger.debug("Playing on system player")
+            systemPlayer.play()
             isPlaying = true
-            logger.info("Play command successful")
-        } catch {
-            logger.error("Failed to play: \(error.localizedDescription)")
-            throw error
+            logger.info("Play command successful on system player")
+        } else {
+            // Use app player for play
+            logger.debug("Playing on app player")
+            do {
+                try await player.play()
+                isPlaying = true
+                logger.info("Play command successful on app player")
+            } catch {
+                logger.error("Failed to play on app player: \(error.localizedDescription)")
+                throw error
+            }
         }
     }
 

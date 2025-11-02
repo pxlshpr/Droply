@@ -48,31 +48,36 @@ struct AnimatedMeshGradient: View {
         // [0,0.5] [0.5,0.5] [1,0.5]
         // [0,1] [0.5,1] [1,1]
 
-        // Calculate animation offsets
+        // Calculate animation offsets with more dynamic movement
         let progressFactor = Float(progress)
         let timeFactor = Float(time)
 
-        // Animate interior points based on progress and time
-        // Keep edges fixed, animate center and edge midpoints
-        let centerOffset = sin(timeFactor * 2.0) * 0.15 * progressFactor
-        let edgeOffset = sin(timeFactor * 1.5 + 1.0) * 0.08 * progressFactor
+        // Create flowing wave motion that moves from left to right
+        let wave1 = sin(timeFactor * 2.5) * 0.2 * progressFactor
+        let wave2 = sin(timeFactor * 2.5 + 1.0) * 0.18 * progressFactor
+        let wave3 = sin(timeFactor * 2.5 + 2.0) * 0.15 * progressFactor
 
-        // Points for 3x3 grid
+        // Vertical wave motion for more fluidity
+        let vertWave1 = cos(timeFactor * 2.0) * 0.15 * progressFactor
+        let vertWave2 = cos(timeFactor * 2.0 + 1.5) * 0.12 * progressFactor
+        let vertWave3 = cos(timeFactor * 2.0 + 3.0) * 0.1 * progressFactor
+
+        // Points for 3x3 grid with flowing wave animation
         let points: [SIMD2<Float>] = [
-            // Top row (keep corners fixed, animate middle)
-            [0.0, 0.0],
-            [0.5 + edgeOffset, 0.0],
-            [1.0, 0.0],
+            // Top row - left edge flows in from start
+            [0.0, 0.0 + vertWave1 * 0.5],
+            [0.5 + wave1 * 0.6, 0.0 + vertWave2 * 0.7],
+            [1.0, 0.0 + vertWave3 * 0.4],
 
-            // Middle row (animate all)
-            [0.0, 0.5 + edgeOffset * 0.7],
-            [0.5 + centerOffset, 0.5 + sin(timeFactor * 2.0 + 0.5) * 0.12 * progressFactor],
-            [1.0, 0.5 + edgeOffset * 0.7],
+            // Middle row - most dynamic movement
+            [0.0, 0.5 + vertWave2 * 0.8],
+            [0.5 + wave2, 0.5 + vertWave1],
+            [1.0, 0.5 + vertWave3 * 0.6],
 
-            // Bottom row (keep corners fixed, animate middle)
-            [0.0, 1.0],
-            [0.5 + edgeOffset * 0.5, 1.0],
-            [1.0, 1.0]
+            // Bottom row - flows like top but inverse
+            [0.0, 1.0 - vertWave1 * 0.5],
+            [0.5 + wave3 * 0.6, 1.0 - vertWave2 * 0.7],
+            [1.0, 1.0 - vertWave3 * 0.4]
         ]
 
         return MeshGradient(

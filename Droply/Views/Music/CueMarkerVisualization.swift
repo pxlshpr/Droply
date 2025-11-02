@@ -71,34 +71,17 @@ struct CueMarkerVisualization: View {
                                     )
                                 }
 
-                                // Shimmer effect overlay
+                                // Subtle shimmer effect overlay
                                 LinearGradient(
                                     colors: [
                                         .clear,
-                                        .white.opacity(0.4),
+                                        .white.opacity(0.3),
                                         .clear
                                     ],
                                     startPoint: .leading,
                                     endPoint: .trailing
                                 )
                                 .offset(x: shimmerOffset * geometry.size.width)
-
-                                // Sparkle particles
-                                Canvas { context, size in
-                                    let particleCount = 6
-                                    let fillWidth = size.width * CGFloat(progress)
-                                    for i in 0..<particleCount {
-                                        let x = (CGFloat(i) / CGFloat(particleCount)) * fillWidth
-                                        let y = size.height / 2 + sin(shimmerOffset * 10 + CGFloat(i)) * 3
-                                        let opacity = (sin(shimmerOffset * 5 + CGFloat(i)) + 1) / 2
-
-                                        context.opacity = opacity * 0.6
-                                        context.fill(
-                                            Circle().path(in: CGRect(x: x - 1.5, y: y - 1.5, width: 3, height: 3)),
-                                            with: .color(.white)
-                                        )
-                                    }
-                                }
                             }
                             .frame(width: geometry.size.width * CGFloat(progress))
                             .animation(.linear, value: progress)

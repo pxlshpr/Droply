@@ -767,13 +767,13 @@ struct NowPlayingView: View {
                         Text(formatCueTime(cueTime))
                             .font(.subheadline)
                             .fontWeight(defaultCueTime == cueTime ? .bold : .medium)
-                            .foregroundStyle(defaultCueTime == cueTime ? .black : .white)
+                            .foregroundStyle(defaultCueTime == cueTime ? .white : .primary)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 8)
-                            .background(defaultCueTime == cueTime ? .white : .white.opacity(0.2))
+                            .background(defaultCueTime == cueTime ? .blue : Color(.systemGray5))
                             .cornerRadius(16)
                             .scaleEffect(defaultCueTime == cueTime ? 1.05 : 1.0)
-                            .shadow(color: defaultCueTime == cueTime ? .white.opacity(0.3) : .clear, radius: 8)
+                            .shadow(color: defaultCueTime == cueTime ? .blue.opacity(0.3) : .clear, radius: 8)
                     }
                     .animation(.spring(response: 0.3, dampingFraction: 0.7), value: defaultCueTime)
                 }
@@ -794,13 +794,13 @@ struct NowPlayingView: View {
                         Text(formatCueTime(duration))
                             .font(.subheadline)
                             .fontWeight(loopDuration == duration ? .bold : .medium)
-                            .foregroundStyle(loopDuration == duration ? .black : .white)
+                            .foregroundStyle(loopDuration == duration ? .white : .primary)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 8)
-                            .background(loopDuration == duration ? .white : .white.opacity(0.2))
+                            .background(loopDuration == duration ? .blue : Color(.systemGray5))
                             .cornerRadius(16)
                             .scaleEffect(loopDuration == duration ? 1.05 : 1.0)
-                            .shadow(color: loopDuration == duration ? .white.opacity(0.3) : .clear, radius: 8)
+                            .shadow(color: loopDuration == duration ? .blue.opacity(0.3) : .clear, radius: 8)
                     }
                     .animation(.spring(response: 0.3, dampingFraction: 0.7), value: loopDuration)
                 }
