@@ -849,8 +849,11 @@ struct NowPlayingView: View {
                     // Try to skip to the next song in the queue
                     try await musicService.skipToNextItem()
 
+                    // Pause immediately to prevent playing from the start
+                    try? await musicService.pause()
+
                     // Wait for the song to change and playback to initialize
-                    try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+                    try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
 
                     // Check if the new song has markers
                     if let currentSong = musicService.currentSong,
@@ -860,8 +863,10 @@ struct NowPlayingView: View {
                         let startTime = max(0, firstMarker.timestamp - defaultCueTime)
                         await musicService.seek(to: startTime)
                         try? await musicService.play()
+                    } else {
+                        // If no markers, resume playback from the beginning
+                        try? await musicService.play()
                     }
-                    // If no markers, just let it play from the beginning
                 } catch {
                     // If skipping fails (no next song), trigger error haptic
                     let generator = UINotificationFeedbackGenerator()
