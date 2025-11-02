@@ -71,6 +71,9 @@ struct RecentlyMarkedView: View {
                                     RecentlyMarkedRow(song: song)
                                         .contentShape(Rectangle())
                                         .onTapGesture {
+                                            // Play delightful haptic feedback
+                                            HapticManager.shared.playMusicalPing()
+
                                             // Cancel any existing play task
                                             currentPlayTask?.cancel()
 
@@ -362,26 +365,27 @@ struct RecentlyMarkedRow: View {
 struct SongMarkerPreview: View {
     let song: MarkedSong
     private let timelineWidth: CGFloat = 80
-    private let timelineHeight: CGFloat = 2
+    private let capsuleHeight: CGFloat = 18
 
     var body: some View {
         ZStack(alignment: .leading) {
-            // Background timeline
-            Rectangle()
-                .fill(.tertiary)
-                .frame(width: timelineWidth, height: timelineHeight)
-                .cornerRadius(1)
+            // Background capsule representing song length
+            Capsule()
+                .fill(.tertiary.opacity(0.3))
+                .frame(width: timelineWidth, height: capsuleHeight)
+                .padding(.horizontal, 1)
+                .padding(.vertical, 1)
 
-            // Markers
+            // Markers positioned within the capsule
             ForEach(song.sortedMarkers) { marker in
                 let position = (marker.timestamp / song.duration) * timelineWidth
 
                 Text(marker.emoji)
-                    .font(.system(size: 8))
-                    .offset(x: position, y: -6)
+                    .font(.system(size: 10))
+                    .offset(x: position - 5) // Center the emoji horizontally
             }
         }
-        .frame(width: timelineWidth, height: 16)
+        .frame(width: timelineWidth, height: capsuleHeight)
     }
 }
 
