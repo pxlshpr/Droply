@@ -45,12 +45,12 @@ class HapticManager {
         }
     }
 
-    /// Plays a delightful "musical ping" haptic pattern
-    /// Creates a bouncy, musical feel like plucking a string
+    /// Plays a heavy impact haptic for song selection
+    /// Provides substantial tactile feedback for significant actions
     func playMusicalPing() {
-        // Use rigid haptic for now - more reliable and satisfying
-        let generator = UIImpactFeedbackGenerator(style: .rigid)
-        generator.prepare()
-        generator.impactOccurred(intensity: 1.0)
+        DispatchQueue.main.async {
+            let generator = UIImpactFeedbackGenerator(style: .heavy)
+            generator.impactOccurred()
+        }
     }
 }

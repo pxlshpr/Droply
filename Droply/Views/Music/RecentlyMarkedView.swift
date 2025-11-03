@@ -84,8 +84,9 @@ struct RecentlyMarkedView: View {
                                         RecentlyMarkedRow(song: song)
                                             .contentShape(Rectangle())
                                             .onTapGesture {
-                                                // Play delightful haptic feedback
-                                                HapticManager.shared.playMusicalPing()
+                                                // Play haptic feedback immediately
+                                                let generator = UIImpactFeedbackGenerator(style: .heavy)
+                                                generator.impactOccurred()
 
                                                 // Cancel any existing play task
                                                 currentPlayTask?.cancel()
