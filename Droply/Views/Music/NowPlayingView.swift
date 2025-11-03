@@ -745,6 +745,8 @@ struct NowPlayingView: View {
                                 image
                                     .resizable()
                                     .aspectRatio(contentMode: .fill)
+                                    .frame(width: geo.size.width, height: geo.size.width)
+                                    .clipped()
                             } else {
                                 placeholderArtwork(size: geo.size.width)
                             }
@@ -757,10 +759,12 @@ struct NowPlayingView: View {
 
                 case .mediaPlayer(let artwork):
                     // For local tracks, use the UIImage directly
-                    if let uiImage = artwork?.image(at: CGSize(width: geo.size.width, height: geo.size.height)) {
+                    if let uiImage = artwork?.image(at: CGSize(width: geo.size.width, height: geo.size.width)) {
                         Image(uiImage: uiImage)
                             .resizable()
                             .aspectRatio(contentMode: .fill)
+                            .frame(width: geo.size.width, height: geo.size.width)
+                            .clipped()
                             .cornerRadius(12)
                             .shadow(radius: 10)
                     } else {

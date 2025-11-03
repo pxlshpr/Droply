@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import MusicKit
+import MediaPlayer
 import NukeUI
 
 struct RecentlyMarkedView: View {
@@ -188,36 +189,56 @@ struct RecentlyMarkedView: View {
             // Check for cancellation before fetching songs
             try Task.checkCancellation()
 
-            // Fetch all songs from MusicKit
-            var songs: [Song] = []
+            // Separate Apple Music and local tracks
+            var appleMusicSongs: [Song] = []
+            var localItems: [ItemToPlay] = []
 
             for markedSong in cyclicalQueue {
                 // Check for cancellation during fetching
                 try Task.checkCancellation()
 
-                let request = MusicCatalogResourceRequest<Song>(
-                    matching: \.id,
-                    equalTo: MusicItemID(markedSong.appleMusicID)
-                )
-                let response = try await request.response()
+                if markedSong.isAppleMusic {
+                    // Fetch from Apple Music
+                    let request = MusicCatalogResourceRequest<Song>(
+                        matching: \.id,
+                        equalTo: MusicItemID(markedSong.appleMusicID)
+                    )
+                    let response = try await request.response()
 
-                if let song = response.items.first {
-                    songs.append(song)
-                } else {
-                    // Log warning but continue with other songs
-                    print("Warning: Could not find song '\(markedSong.title)' in Apple Music")
+                    if let song = response.items.first {
+                        appleMusicSongs.append(song)
+                    } else {
+                        print("Warning: Could not find song '\(markedSong.title)' in Apple Music")
+                    }
+                } else if markedSong.isLocal {
+                    // Create ItemToPlay from local track data
+                    let item = ItemToPlay(
+                        id: markedSong.persistentID,
+                        isPlayable: true,
+                        appleStoreID: nil,
+                        applePersistentID: markedSong.persistentID,
+                        title: markedSong.title,
+                        artist: markedSong.artist,
+                        durationInSeconds: markedSong.duration,
+                        isrc: nil
+                    )
+                    localItems.append(item)
                 }
             }
 
-            guard !songs.isEmpty else {
+            // Combine into items for queue manager
+            let appleMusicItems = appleMusicSongs.map { ItemToPlay(song: $0) }
+            let allItems = appleMusicItems + localItems
+
+            guard !allItems.isEmpty else {
                 return
             }
 
             // Check for cancellation before playing
             try Task.checkCancellation()
 
-            // Play all songs using the queue manager
-            try await musicService.playSongsWithQueueManager(songs)
+            // Play all items using the queue manager
+            try await AppleMusicQueueManager.shared.play(allItems)
 
             // Wait a moment for playback to initialize before seeking
             try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
@@ -251,29 +272,50 @@ struct RecentlyMarkedView: View {
         dismiss()
 
         do {
-            // Fetch all songs from MusicKit
-            var songs: [Song] = []
+            // Separate Apple Music and local tracks
+            var appleMusicSongs: [Song] = []
+            var localItems: [ItemToPlay] = []
 
             for markedSong in recentlyMarkedSongs {
-                let request = MusicCatalogResourceRequest<Song>(
-                    matching: \.id,
-                    equalTo: MusicItemID(markedSong.appleMusicID)
-                )
-                let response = try await request.response()
+                if markedSong.isAppleMusic {
+                    // Fetch from Apple Music
+                    let request = MusicCatalogResourceRequest<Song>(
+                        matching: \.id,
+                        equalTo: MusicItemID(markedSong.appleMusicID)
+                    )
+                    let response = try await request.response()
 
-                if let song = response.items.first {
-                    songs.append(song)
-                } else {
-                    print("Warning: Could not find song '\(markedSong.title)' in Apple Music")
+                    if let song = response.items.first {
+                        appleMusicSongs.append(song)
+                    } else {
+                        print("Warning: Could not find song '\(markedSong.title)' in Apple Music")
+                    }
+                } else if markedSong.isLocal {
+                    // Create ItemToPlay from local track data
+                    let item = ItemToPlay(
+                        id: markedSong.persistentID,
+                        isPlayable: true,
+                        appleStoreID: nil,
+                        applePersistentID: markedSong.persistentID,
+                        title: markedSong.title,
+                        artist: markedSong.artist,
+                        durationInSeconds: markedSong.duration,
+                        isrc: nil
+                    )
+                    localItems.append(item)
                 }
             }
 
-            guard !songs.isEmpty else {
+            // Combine into items for queue manager
+            let appleMusicItems = appleMusicSongs.map { ItemToPlay(song: $0) }
+            let allItems = appleMusicItems + localItems
+
+            guard !allItems.isEmpty else {
                 return
             }
 
-            // Play all songs using the queue manager
-            try await musicService.playSongsWithQueueManager(songs)
+            // Play all items using the queue manager
+            try await AppleMusicQueueManager.shared.play(allItems)
 
             // Wait a moment for playback to initialize before seeking
             try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
@@ -327,39 +369,41 @@ struct RecentlyMarkedView: View {
 
 struct RecentlyMarkedRow: View {
     let song: MarkedSong
+    @State private var localArtwork: UIImage?
 
     var body: some View {
         HStack(spacing: 12) {
             // Artwork
-            if let artworkURLString = song.artworkURL,
-               let artworkURL = URL(string: artworkURLString) {
-                LazyImage(url: artworkURL) { state in
-                    if let image = state.image {
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } else {
-                        Rectangle()
-                            .fill(.ultraThinMaterial)
-                            .overlay {
-                                Image(systemName: "music.note")
-                                    .foregroundStyle(.secondary)
-                            }
+            Group {
+                if let artworkURLString = song.artworkURL,
+                   let artworkURL = URL(string: artworkURLString) {
+                    // Apple Music track - use URL
+                    LazyImage(url: artworkURL) { state in
+                        if let image = state.image {
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        } else {
+                            placeholderArtwork
+                        }
                     }
+                } else if song.isLocal, let artwork = localArtwork {
+                    // Local track - use UIImage
+                    Image(uiImage: artwork)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } else if song.isLocal {
+                    // Local track but artwork not loaded yet
+                    placeholderArtwork
+                        .task {
+                            await loadLocalArtwork()
+                        }
+                } else {
+                    placeholderArtwork
                 }
-                .frame(width: 44, height: 44)
-                .cornerRadius(6)
-            } else {
-                Rectangle()
-                    .fill(.ultraThinMaterial)
-                    .overlay {
-                        Image(systemName: "music.note")
-                            .foregroundStyle(.secondary)
-                            .font(.caption)
-                    }
-                    .frame(width: 44, height: 44)
-                    .cornerRadius(6)
             }
+            .frame(width: 44, height: 44)
+            .cornerRadius(6)
 
             // Song info
             VStack(alignment: .leading, spacing: 2) {
@@ -379,6 +423,38 @@ struct RecentlyMarkedRow: View {
             SongMarkerPreview(song: song)
         }
         .padding(.vertical, 0)
+    }
+
+    private var placeholderArtwork: some View {
+        Rectangle()
+            .fill(.ultraThinMaterial)
+            .overlay {
+                Image(systemName: "music.note")
+                    .foregroundStyle(.secondary)
+                    .font(.caption)
+            }
+    }
+
+    private func loadLocalArtwork() async {
+        // Get the persistent ID
+        guard let persistentIDString = song.persistentID.isEmpty ? nil : song.persistentID,
+              let persistentID = UInt64(persistentIDString) else {
+            return
+        }
+
+        // Search for the media item
+        let query = MPMediaQuery.songs()
+        let predicate = MPMediaPropertyPredicate(
+            value: persistentID,
+            forProperty: MPMediaItemPropertyPersistentID
+        )
+        query.addFilterPredicate(predicate)
+
+        // Get artwork from the media item
+        if let mediaItem = query.items?.first,
+           let artwork = mediaItem.artwork {
+            localArtwork = artwork.image(at: CGSize(width: 44, height: 44))
+        }
     }
 }
 
