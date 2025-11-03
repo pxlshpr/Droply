@@ -33,7 +33,7 @@ class AppleMusicQueueManager {
     func play(_ items: [ItemToPlay]) async throws {
         guard !items.isEmpty else {
             logger.warning("Attempted to play empty list")
-            return
+            throw QueueError.emptyQueue
         }
 
         logger.info("Playing \(items.count) items, starting with: \(items[0].title)")
@@ -41,13 +41,17 @@ class AppleMusicQueueManager {
         // Set queue with first item
         guard let firstValidIndex = await setQueueWithFirstValidItem(from: items) else {
             logger.error("No valid items found to play")
-            return
+            throw QueueError.invalidItem
         }
+
+        logger.info("Successfully set queue, now starting playback")
 
         // Start playing
         systemPlayer.shuffleMode = .off
         systemPlayer.repeatMode = .all
         systemPlayer.play()
+
+        logger.info("Called systemPlayer.play()")
 
         // Append remaining items
         let remaining = Array(items.dropFirst(firstValidIndex + 1))
@@ -62,9 +66,16 @@ class AppleMusicQueueManager {
 
         if item.isAppleStoreItem, let storeID = item.validAppleStoreID {
             // Apple Music catalog item
-            logger.debug("Setting queue with store ID: \(storeID)")
+            logger.info("Setting queue with store ID: \(storeID)")
             systemPlayer.setQueue(with: [storeID])
-            try await systemPlayer.prepareToPlay()
+
+            do {
+                try await systemPlayer.prepareToPlay()
+                logger.info("Successfully prepared to play: \(item.title)")
+            } catch {
+                logger.error("Failed to prepare playback for \(item.title): \(error.localizedDescription)")
+                throw error
+            }
         } else if item.isAppleLibraryItem {
             // Library item - need to look it up
             logger.debug("Looking up library item")

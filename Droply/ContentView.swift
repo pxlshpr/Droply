@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import MusicKit
+import MediaPlayer
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
@@ -15,6 +16,8 @@ struct ContentView: View {
     @State private var showingAuthorization = false
     @State private var showingNowPlaying = false
     @State private var currentPlayTask: Task<Void, Never>?
+    @State private var showingError = false
+    @State private var errorMessage = ""
 
     @Query(
         filter: #Predicate<MarkedSong> { song in
@@ -138,6 +141,11 @@ struct ContentView: View {
             .sheet(isPresented: $showingNowPlaying) {
                 NowPlayingView()
             }
+            .alert("Playback Error", isPresented: $showingError) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(errorMessage)
+            }
         }
     }
 
@@ -225,8 +233,11 @@ struct ContentView: View {
             // Check for cancellation before proceeding
             try Task.checkCancellation()
 
+            print("🎵 Starting to play song: \(markedSong.title)")
+
             // Find the index of the tapped song
             guard let tappedIndex = recentlyMarkedSongs.firstIndex(where: { $0.id == markedSong.id }) else {
+                print("❌ Could not find song in list")
                 return
             }
 
@@ -238,36 +249,67 @@ struct ContentView: View {
             // Check for cancellation before fetching songs
             try Task.checkCancellation()
 
-            // Fetch all songs from MusicKit
-            var songs: [Song] = []
+            print("🔍 Processing \(cyclicalQueue.count) songs (Apple Music + Local)...")
+
+            // Separate Apple Music and local tracks
+            var items: [ItemToPlay] = []
 
             for markedSong in cyclicalQueue {
                 // Check for cancellation during fetching
                 try Task.checkCancellation()
 
-                let request = MusicCatalogResourceRequest<Song>(
-                    matching: \.id,
-                    equalTo: MusicItemID(markedSong.appleMusicID)
-                )
-                let response = try await request.response()
+                if markedSong.isAppleMusic {
+                    // Fetch from Apple Music catalog
+                    let request = MusicCatalogResourceRequest<Song>(
+                        matching: \.id,
+                        equalTo: MusicItemID(markedSong.appleMusicID)
+                    )
+                    let response = try await request.response()
 
-                if let song = response.items.first {
-                    songs.append(song)
-                } else {
-                    // Log warning but continue with other songs
-                    print("Warning: Could not find song '\(markedSong.title)' in Apple Music")
+                    if let song = response.items.first {
+                        let item = ItemToPlay(song: song)
+                        items.append(item)
+                        print("✅ Found Apple Music track: \(markedSong.title)")
+                    } else {
+                        print("⚠️ Warning: Could not find Apple Music track '\(markedSong.title)'")
+                    }
+                } else if markedSong.isLocal {
+                    // Look up local track by persistent ID
+                    if let mediaItem = await findLocalTrack(persistentID: markedSong.persistentID, title: markedSong.title, artist: markedSong.artist, duration: markedSong.duration) {
+                        let item = ItemToPlay(
+                            id: markedSong.persistentID,
+                            isPlayable: true,
+                            appleStoreID: nil,
+                            applePersistentID: markedSong.persistentID,
+                            title: markedSong.title,
+                            artist: markedSong.artist,
+                            durationInSeconds: markedSong.duration,
+                            isrc: nil
+                        )
+                        items.append(item)
+                        print("✅ Found local track: \(markedSong.title)")
+                    } else {
+                        print("⚠️ Warning: Could not find local track '\(markedSong.title)'")
+                    }
                 }
             }
 
-            guard !songs.isEmpty else {
+            guard !items.isEmpty else {
+                print("❌ No songs found to play")
+                errorMessage = "Could not find any songs to play. Please check your library and Apple Music subscription."
+                showingError = true
                 return
             }
+
+            print("✅ Found \(items.count) items, now playing...")
 
             // Check for cancellation before playing
             try Task.checkCancellation()
 
-            // Play all songs using the queue manager
-            try await musicService.playSongsWithQueueManager(songs)
+            // Play all items using the queue manager
+            try await AppleMusicQueueManager.shared.play(items)
+
+            print("🎵 Playback started successfully")
 
             // Wait a moment for playback to initialize before seeking
             try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
@@ -290,10 +332,64 @@ struct ContentView: View {
             try? modelContext.save()
         } catch is CancellationError {
             // Task was cancelled - this is expected when user taps another song quickly
-            print("Play song task was cancelled")
+            print("⏸️ Play song task was cancelled")
         } catch {
-            print("Failed to play song: \(error.localizedDescription)")
+            print("❌ Failed to play song: \(error.localizedDescription)")
+            errorMessage = "Failed to play song: \(error.localizedDescription)"
+            showingError = true
         }
+    }
+
+    /// Find a local track in the library by persistent ID or metadata
+    private func findLocalTrack(persistentID: String, title: String, artist: String, duration: TimeInterval) async -> MPMediaItem? {
+        // Try by persistent ID first
+        if let id = UInt64(persistentID) {
+            let query = MPMediaQuery.songs()
+            let predicate = MPMediaPropertyPredicate(
+                value: id,
+                forProperty: MPMediaItemPropertyPersistentID
+            )
+            query.addFilterPredicate(predicate)
+
+            if let mediaItem = query.items?.first {
+                print("📍 Found track by persistent ID: \(persistentID)")
+                return mediaItem
+            }
+        }
+
+        // Fallback: search by title and artist
+        let titlePredicate = MPMediaPropertyPredicate(
+            value: title,
+            forProperty: MPMediaItemPropertyTitle,
+            comparisonType: .equalTo
+        )
+        let artistPredicate = MPMediaPropertyPredicate(
+            value: artist,
+            forProperty: MPMediaItemPropertyArtist,
+            comparisonType: .equalTo
+        )
+
+        let query = MPMediaQuery.songs()
+        query.addFilterPredicate(titlePredicate)
+        query.addFilterPredicate(artistPredicate)
+
+        if let items = query.items, !items.isEmpty {
+            // If multiple matches, try to match by duration
+            if items.count > 1 {
+                let matches = items.filter { abs($0.playbackDuration - duration) < 1.0 }
+                if let match = matches.first {
+                    print("📍 Found track by title/artist/duration")
+                    return match
+                }
+            }
+
+            // Return first match
+            print("📍 Found track by title/artist")
+            return items.first
+        }
+
+        print("❌ Track not found in library")
+        return nil
     }
 
     private func timePeriod(for date: Date, relativeTo now: Date) -> String {
