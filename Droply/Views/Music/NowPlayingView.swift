@@ -84,7 +84,12 @@ struct NowPlayingView: View {
                             .foregroundStyle(.white.opacity(0.8))
                     }
                     .padding(.horizontal)
-                } else if let track = musicService.currentTrack ?? musicService.pendingTrack, !isPreview {
+                } else if musicService.currentTrack != nil || musicService.pendingTrack != nil || musicService.pendingMarkedSong != nil, !isPreview {
+                    // Get display values from available track or pending marked song
+                    let track = musicService.currentTrack ?? musicService.pendingTrack
+                    let displayTitle = track?.title ?? musicService.pendingMarkedSong?.title ?? "Unknown"
+                    let displayArtist = track?.artistName ?? musicService.pendingMarkedSong?.artist ?? "Unknown"
+
                     // Calculate available space accounting for safe areas
                     let bottomSafeArea = max(geometry.safeAreaInsets.bottom, 20) // Minimum 20pt padding
                     let availableHeight = geometry.size.height - bottomSafeArea
@@ -113,22 +118,48 @@ struct NowPlayingView: View {
                     let playButtonSize: CGFloat = min(60, markerButtonUnit * 1.0)
 
                     VStack(spacing: 0) {
-                        // Album artwork
-                        albumArtwork(for: track)
+                        // Album artwork - show placeholder if only pending marked song
+                        if let track = track {
+                            albumArtwork(for: track)
+                                .frame(width: artworkSize, height: artworkSize)
+                                .padding(.horizontal, 16)
+                                .padding(.bottom, 16)
+                        } else if let artworkURL = musicService.pendingMarkedSong?.artworkURL,
+                                  let url = URL(string: artworkURL) {
+                            // Show artwork from URL for pending marked song
+                            LazyImage(url: url) { state in
+                                if let image = state.image {
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(width: artworkSize, height: artworkSize)
+                                        .clipped()
+                                        .cornerRadius(12)
+                                        .shadow(radius: 10)
+                                } else {
+                                    placeholderArtwork(size: artworkSize)
+                                }
+                            }
                             .frame(width: artworkSize, height: artworkSize)
                             .padding(.horizontal, 16)
                             .padding(.bottom, 16)
+                        } else {
+                            placeholderArtwork(size: artworkSize)
+                                .frame(width: artworkSize, height: artworkSize)
+                                .padding(.horizontal, 16)
+                                .padding(.bottom, 16)
+                        }
 
-                        // Song info
+                        // Song info - use display values
                         VStack(spacing: 2) {
-                            Text(track.title)
+                            Text(displayTitle)
                                 .font(.title3)
                                 .fontWeight(.bold)
                                 .multilineTextAlignment(.center)
                                 .foregroundStyle(.white)
                                 .lineLimit(1)
 
-                            Text(track.artistName)
+                            Text(displayArtist)
                                 .font(.subheadline)
                                 .foregroundStyle(.white.opacity(0.8))
                                 .lineLimit(1)

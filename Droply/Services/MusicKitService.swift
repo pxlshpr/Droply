@@ -32,6 +32,10 @@ class MusicKitService: ObservableObject {
     // while waiting for actual playback to start
     @Published var pendingTrack: PlayableTrack?
 
+    // Pending marked song - used for instant metadata display when tapping a song
+    // This shows immediately while the actual track is being fetched/loaded
+    @Published var pendingMarkedSong: MarkedSong?
+
     // Legacy: Keep currentSong and pendingSong for backwards compatibility
     var currentSong: Song? { currentTrack?.song }
     var pendingSong: Song? { pendingTrack?.song }
@@ -70,6 +74,7 @@ class MusicKitService: ObservableObject {
                     // Clear pending track when actual track starts playing
                     if track != nil {
                         self?.clearPendingTrack()
+                        self?.pendingMarkedSong = nil
                     }
                 }
             }
@@ -478,6 +483,19 @@ class MusicKitService: ObservableObject {
 
     // MARK: - Pending Track Management
 
+    /// Set pending marked song for instant metadata display
+    /// Call this immediately when user taps a song to show metadata before playback starts
+    public func setPendingMarkedSong(_ markedSong: MarkedSong) {
+        logger.debug("Setting pending marked song: \(markedSong.title)")
+        pendingMarkedSong = markedSong
+    }
+
+    /// Clear pending marked song
+    public func clearPendingMarkedSong() {
+        logger.debug("Clearing pending marked song")
+        pendingMarkedSong = nil
+    }
+
     private func setPendingTrack(_ track: PlayableTrack) {
         logger.debug("Setting pending track: \(track.title)")
 
@@ -509,6 +527,7 @@ class MusicKitService: ObservableObject {
         pendingSongGraceTask?.cancel()
         pendingSongGraceTask = nil
         pendingTrack = nil
+        pendingMarkedSong = nil
     }
 
     // Legacy methods for backwards compatibility
@@ -762,7 +781,7 @@ class MusicKitService: ObservableObject {
             // Check for cancellation again before making the call
             try Task.checkCancellation()
 
-            try await AppleMusicQueueManager.shared.play(items)
+            try await AppleMusicQueueManager.shared.playWithDebounce(items)
 
             // Check for cancellation before updating state
             try Task.checkCancellation()

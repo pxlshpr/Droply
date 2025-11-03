@@ -84,6 +84,9 @@ struct RecentlyMarkedView: View {
                                         RecentlyMarkedRow(song: song)
                                             .contentShape(Rectangle())
                                             .onTapGesture {
+                                                // Instant feedback: Set pending marked song for immediate UI update
+                                                musicService.setPendingMarkedSong(song)
+
                                                 // Play haptic feedback immediately
                                                 let generator = UIImpactFeedbackGenerator(style: .heavy)
                                                 generator.impactOccurred()
@@ -238,11 +241,11 @@ struct RecentlyMarkedView: View {
             // Check for cancellation before playing
             try Task.checkCancellation()
 
-            // Play all items using the queue manager
-            try await AppleMusicQueueManager.shared.play(allItems)
+            // Play with debouncing - first song plays immediately, rest queued after delay
+            try await AppleMusicQueueManager.shared.playWithDebounce(allItems)
 
-            // Wait a moment for playback to initialize before seeking
-            try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            // Brief wait for playback to stabilize before seeking (reduced from 0.5s to 0.1s for better UX)
+            try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
 
             // Handle play mode for the first song (the tapped song) - seek after starting playback
             switch playMode {
@@ -315,8 +318,8 @@ struct RecentlyMarkedView: View {
                 return
             }
 
-            // Play all items using the queue manager
-            try await AppleMusicQueueManager.shared.play(allItems)
+            // Play with debouncing - first song plays immediately, rest queued after delay
+            try await AppleMusicQueueManager.shared.playWithDebounce(allItems)
 
             // Wait a moment for playback to initialize before seeking
             try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds

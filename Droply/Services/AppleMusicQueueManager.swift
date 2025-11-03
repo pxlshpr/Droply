@@ -16,6 +16,10 @@ class AppleMusicQueueManager {
     private let systemPlayer = MPMusicPlayerController.systemMusicPlayer
     private let logger = Logger(subsystem: "com.droply.app", category: "QueueManager")
 
+    // Debouncing state for queue management
+    private var pendingQueueTask: Task<Void, Never>?
+    private let queueDebounceDelay: UInt64 = 1_500_000_000 // 1.5 seconds in nanoseconds
+
     private init() {
         systemPlayer.beginGeneratingPlaybackNotifications()
     }
@@ -56,6 +60,71 @@ class AppleMusicQueueManager {
         // Append remaining items
         let remaining = Array(items.dropFirst(firstValidIndex + 1))
         await appendItems(remaining)
+    }
+
+    /// Plays multiple items with debouncing - first song plays immediately,
+    /// rest of queue is added after a delay. If called again before delay completes,
+    /// cancels the previous queue and starts over.
+    func playWithDebounce(_ items: [ItemToPlay]) async throws {
+        guard !items.isEmpty else {
+            logger.warning("Attempted to play empty list")
+            throw QueueError.emptyQueue
+        }
+
+        // Cancel any pending queue task
+        if let existingTask = pendingQueueTask {
+            logger.info("Cancelling previous pending queue task")
+            existingTask.cancel()
+            pendingQueueTask = nil
+        }
+
+        logger.info("Playing with debounce: \(items.count) items, starting with: \(items[0].title)")
+
+        // Set queue with ONLY the first item
+        guard let firstValidIndex = await setQueueWithFirstValidItem(from: [items[0]]) else {
+            logger.error("No valid items found to play")
+            throw QueueError.invalidItem
+        }
+
+        logger.info("Successfully set queue with first item, now starting playback")
+
+        // Start playing immediately
+        systemPlayer.shuffleMode = .off
+        systemPlayer.repeatMode = .all
+        systemPlayer.play()
+
+        logger.info("Called systemPlayer.play() for first item")
+
+        // Only queue remaining items if there are more than 1 item total
+        guard items.count > 1 else {
+            logger.info("Only one item to play, no need to queue more")
+            return
+        }
+
+        // Schedule task to append remaining items after delay
+        let remaining = Array(items.dropFirst(1))
+        pendingQueueTask = Task { @MainActor in
+            do {
+                logger.info("Waiting \(Double(self.queueDebounceDelay) / 1_000_000_000)s before queueing remaining \(remaining.count) items")
+                try await Task.sleep(nanoseconds: self.queueDebounceDelay)
+
+                // Check if task was cancelled
+                if Task.isCancelled {
+                    self.logger.info("Queue task was cancelled before appending items")
+                    return
+                }
+
+                self.logger.info("Debounce delay completed, now appending \(remaining.count) items")
+                await self.appendItems(remaining)
+                self.logger.info("Successfully queued remaining items")
+
+                // Clear the task reference
+                self.pendingQueueTask = nil
+            } catch {
+                // Task was cancelled or sleep was interrupted
+                self.logger.info("Queue task interrupted: \(error.localizedDescription)")
+            }
+        }
     }
 
     // MARK: - Private Queue Management

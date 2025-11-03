@@ -71,6 +71,13 @@ struct ContentView: View {
                                         RecentlyMarkedRow(song: song)
                                             .contentShape(Rectangle())
                                             .onTapGesture {
+                                                // Instant feedback: Set pending marked song for immediate UI update
+                                                musicService.setPendingMarkedSong(song)
+
+                                                // Haptic feedback for instant responsiveness
+                                                let generator = UIImpactFeedbackGenerator(style: .light)
+                                                generator.impactOccurred()
+
                                                 // Cancel any existing play task
                                                 currentPlayTask?.cancel()
 
@@ -177,8 +184,8 @@ struct ContentView: View {
             // Play all songs using the queue manager
             try await musicService.playSongsWithQueueManager(songs)
 
-            // Wait a moment for playback to initialize before seeking
-            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            // Brief wait for playback to stabilize before seeking (reduced from 0.5s to 0.1s for better UX)
+            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
 
             // Handle play mode for the first song - seek after starting playback
             switch playMode {
@@ -274,8 +281,8 @@ struct ContentView: View {
                         print("⚠️ Warning: Could not find Apple Music track '\(markedSong.title)'")
                     }
                 } else if markedSong.isLocal {
-                    // Look up local track by persistent ID
-                    if let mediaItem = await findLocalTrack(persistentID: markedSong.persistentID, title: markedSong.title, artist: markedSong.artist, duration: markedSong.duration) {
+                    // Look up local track by persistent ID to verify it exists
+                    if await findLocalTrack(persistentID: markedSong.persistentID, title: markedSong.title, artist: markedSong.artist, duration: markedSong.duration) != nil {
                         let item = ItemToPlay(
                             id: markedSong.persistentID,
                             isPlayable: true,
@@ -296,7 +303,7 @@ struct ContentView: View {
 
             guard !items.isEmpty else {
                 print("❌ No songs found to play")
-                errorMessage = "Could not find any songs to play. Please check your library and Apple Music subscription."
+                errorMessage = "Could not find '\(markedSong.title)' by \(markedSong.artist). Please check your library and Apple Music subscription."
                 showingError = true
                 return
             }
@@ -306,13 +313,13 @@ struct ContentView: View {
             // Check for cancellation before playing
             try Task.checkCancellation()
 
-            // Play all items using the queue manager
-            try await AppleMusicQueueManager.shared.play(items)
+            // Play with debouncing - first song plays immediately, rest queued after delay
+            try await AppleMusicQueueManager.shared.playWithDebounce(items)
 
             print("🎵 Playback started successfully")
 
-            // Wait a moment for playback to initialize before seeking
-            try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            // Brief wait for playback to stabilize before seeking (reduced from 0.5s to 0.1s for better UX)
+            try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
 
             // Handle play mode for the first song (the tapped song) - seek after starting playback
             switch playMode {
@@ -335,7 +342,7 @@ struct ContentView: View {
             print("⏸️ Play song task was cancelled")
         } catch {
             print("❌ Failed to play song: \(error.localizedDescription)")
-            errorMessage = "Failed to play song: \(error.localizedDescription)"
+            errorMessage = "Failed to play '\(markedSong.title)' by \(markedSong.artist): \(error.localizedDescription)"
             showingError = true
         }
     }
