@@ -19,7 +19,7 @@ class MusicKitService: ObservableObject {
     private let logger = Logger(subsystem: "com.droply.app", category: "MusicKit")
 
     @Published var authorizationStatus: MusicAuthorization.Status = MusicAuthorization.currentStatus
-    @Published var currentSong: Song?
+    @Published var currentTrack: PlayableTrack?
     @Published var isPlaying: Bool = false
     @Published var playbackTime: TimeInterval = 0
     @Published var playbackDuration: TimeInterval = 0
@@ -28,9 +28,13 @@ class MusicKitService: ObservableObject {
     @Published var isLoadingSong: Bool = false
     @Published var loadingSongTitle: String?
 
-    // Pending song state - used to show the upcoming song immediately when tapped
+    // Pending track state - used to show the upcoming track immediately when tapped
     // while waiting for actual playback to start
-    @Published var pendingSong: Song?
+    @Published var pendingTrack: PlayableTrack?
+
+    // Legacy: Keep currentSong and pendingSong for backwards compatibility
+    var currentSong: Song? { currentTrack?.song }
+    var pendingSong: Song? { pendingTrack?.song }
 
     // Pre-extracted artwork colors
     @Published var backgroundColor1: Color = .purple.opacity(0.3)
@@ -57,15 +61,15 @@ class MusicKitService: ObservableObject {
             await updateAuthorizationStatus()
         }
 
-        // Observe currentSong changes to extract colors
-        $currentSong
-            .sink { [weak self] song in
+        // Observe currentTrack changes to extract colors
+        $currentTrack
+            .sink { [weak self] track in
                 Task { @MainActor [weak self] in
-                    await self?.extractColorsFromArtwork(for: song)
+                    await self?.extractColorsFromArtwork(for: track)
 
-                    // Clear pending song when actual song starts playing
-                    if song != nil {
-                        self?.clearPendingSong()
+                    // Clear pending track when actual track starts playing
+                    if track != nil {
+                        self?.clearPendingTrack()
                     }
                 }
             }
@@ -174,15 +178,15 @@ class MusicKitService: ObservableObject {
         // Get current media item
         guard let mediaItem = systemPlayer.nowPlayingItem else {
             logger.warning("System player has no now playing item on startup")
-            currentSong = nil
+            currentTrack = nil
             isCheckingPlayback = false
             return
         }
 
         logger.info("System player now playing on startup: \(mediaItem.title ?? "Unknown") by \(mediaItem.artist ?? "Unknown")")
 
-        // Try to convert MPMediaItem to MusicKit Song
-        await convertMediaItemToSong(mediaItem)
+        // Try to convert MPMediaItem to PlayableTrack
+        await convertMediaItemToTrack(mediaItem)
 
         // Mark check as complete
         isCheckingPlayback = false
@@ -200,7 +204,7 @@ class MusicKitService: ObservableObject {
         // Get current media item
         guard let mediaItem = systemPlayer.nowPlayingItem else {
             logger.warning("System player has no now playing item")
-            currentSong = nil
+            currentTrack = nil
             return
         }
 
@@ -213,13 +217,13 @@ class MusicKitService: ObservableObject {
             logger.debug("Cleared loading state - system player is now playing")
         }
 
-        // Try to convert MPMediaItem to MusicKit Song
+        // Try to convert MPMediaItem to PlayableTrack
         Task {
-            await convertMediaItemToSong(mediaItem)
+            await convertMediaItemToTrack(mediaItem)
         }
     }
 
-    private func convertMediaItemToSong(_ mediaItem: MPMediaItem) async {
+    private func convertMediaItemToTrack(_ mediaItem: MPMediaItem) async {
         // Get playback store ID if available (for Apple Music tracks)
         let playbackStoreID = mediaItem.playbackStoreID
 
@@ -233,10 +237,11 @@ class MusicKitService: ObservableObject {
 
                 if let song = response.items.first {
                     await MainActor.run {
-                        self.currentSong = song
+                        let track = PlayableTrack(song: song)
+                        self.currentTrack = track
                         self.playbackDuration = song.duration ?? 0
                         self.playbackTime = systemPlayer.currentPlaybackTime
-                        logger.info("Successfully converted to MusicKit Song: \(song.title)")
+                        logger.info("Successfully converted to Apple Music track: \(song.title)")
                     }
                 } else {
                     logger.warning("Could not find MusicKit song for store ID: \(playbackStoreID)")
@@ -253,13 +258,13 @@ class MusicKitService: ObservableObject {
     }
 
     private func handleLocalMediaItem(_ mediaItem: MPMediaItem) async {
-        // For local tracks, we can't get a MusicKit Song, so currentSong remains nil
-        // But we can still update duration and playback time
+        // Create a PlayableTrack from the local media item
         await MainActor.run {
-            self.currentSong = nil
+            let track = PlayableTrack(mediaItem: mediaItem)
+            self.currentTrack = track
             self.playbackDuration = mediaItem.playbackDuration
             self.playbackTime = systemPlayer.currentPlaybackTime
-            logger.info("Using local media item (no MusicKit Song available)")
+            logger.info("Using local track: \(track.title) by \(track.artistName) (persistent ID: \(mediaItem.persistentID))")
         }
     }
 
@@ -275,9 +280,10 @@ class MusicKitService: ObservableObject {
         if let nowPlayingEntry = player.queue.currentEntry {
             logger.debug("Current queue entry exists at index: \(queueEntries.firstIndex(where: { $0.id == nowPlayingEntry.id }) ?? -1)")
             if case .song(let song) = nowPlayingEntry.item {
-                currentSong = song
+                let track = PlayableTrack(song: song)
+                currentTrack = track
                 playbackDuration = song.duration ?? 0
-                logger.info("Current song updated from app player: \(song.title) by \(song.artistName) (ID: \(song.id.rawValue))")
+                logger.info("Current track updated from app player: \(song.title) by \(song.artistName) (ID: \(song.id.rawValue))")
 
                 // Clear loading state when song is confirmed to be playing
                 if isLoadingSong && playbackStatus == .playing {
@@ -470,39 +476,48 @@ class MusicKitService: ObservableObject {
         playbackTime = time
     }
 
-    // MARK: - Pending Song Management
+    // MARK: - Pending Track Management
 
-    private func setPendingSong(_ song: Song) {
-        logger.debug("Setting pending song: \(song.title)")
+    private func setPendingTrack(_ track: PlayableTrack) {
+        logger.debug("Setting pending track: \(track.title)")
 
         // Cancel any existing grace period
         pendingSongGraceTask?.cancel()
 
-        // Set the pending song
-        pendingSong = song
+        // Set the pending track
+        pendingTrack = track
 
         // Start grace period timer
         pendingSongGraceTask = Task { @MainActor in
             do {
                 try await Task.sleep(nanoseconds: UInt64(pendingSongGracePeriod * 1_000_000_000))
 
-                // If we reach here and the song still hasn't started playing, clear the pending state
-                if !Task.isCancelled && self.currentSong == nil {
-                    logger.warning("Grace period expired and song hasn't started playing - clearing pending song")
-                    self.clearPendingSong()
+                // If we reach here and the track still hasn't started playing, clear the pending state
+                if !Task.isCancelled && self.currentTrack == nil {
+                    logger.warning("Grace period expired and track hasn't started playing - clearing pending track")
+                    self.clearPendingTrack()
                 }
             } catch {
                 // Task was cancelled, which is fine
-                logger.debug("Pending song grace period task cancelled")
+                logger.debug("Pending track grace period task cancelled")
             }
         }
     }
 
-    private func clearPendingSong() {
-        logger.debug("Clearing pending song")
+    private func clearPendingTrack() {
+        logger.debug("Clearing pending track")
         pendingSongGraceTask?.cancel()
         pendingSongGraceTask = nil
-        pendingSong = nil
+        pendingTrack = nil
+    }
+
+    // Legacy methods for backwards compatibility
+    private func setPendingSong(_ song: Song) {
+        setPendingTrack(PlayableTrack(song: song))
+    }
+
+    private func clearPendingSong() {
+        clearPendingTrack()
     }
 
     // MARK: - Queue Management
@@ -531,8 +546,9 @@ class MusicKitService: ObservableObject {
 
             player.queue = ApplicationMusicPlayer.Queue(for: [song], startingAt: song)
 
-            // Explicitly update currentSong immediately for UI responsiveness
-            currentSong = song
+            // Explicitly update currentTrack immediately for UI responsiveness
+            let track = PlayableTrack(song: song)
+            currentTrack = track
             playbackDuration = song.duration ?? 0
 
             // Check for cancellation again before playing
@@ -574,8 +590,9 @@ class MusicKitService: ObservableObject {
         logger.info("Preparing queue for song: \(song.title) by \(song.artistName) (without playing)")
         player.queue = ApplicationMusicPlayer.Queue(for: [song], startingAt: song)
 
-        // Explicitly update currentSong immediately for UI responsiveness
-        currentSong = song
+        // Explicitly update currentTrack immediately for UI responsiveness
+        let track = PlayableTrack(song: song)
+        currentTrack = track
         playbackDuration = song.duration ?? 0
 
         logger.debug("Queue set, ready to play")
@@ -674,8 +691,9 @@ class MusicKitService: ObservableObject {
             // Check for cancellation before updating state
             try Task.checkCancellation()
 
-            // Update current song immediately for UI responsiveness
-            currentSong = song
+            // Update current track immediately for UI responsiveness
+            let track = PlayableTrack(song: song)
+            currentTrack = track
             playbackDuration = song.duration ?? 0
             isPlaying = true
 
@@ -749,8 +767,9 @@ class MusicKitService: ObservableObject {
             // Check for cancellation before updating state
             try Task.checkCancellation()
 
-            // Update current song immediately for UI responsiveness (first song in list)
-            currentSong = firstSong
+            // Update current track immediately for UI responsiveness (first song in list)
+            let track = PlayableTrack(song: firstSong)
+            currentTrack = track
             playbackDuration = firstSong.duration ?? 0
             isPlaying = true
 
@@ -811,8 +830,13 @@ class MusicKitService: ObservableObject {
     // MARK: - Current Playback Info
 
     func getCurrentPlaybackInfo() -> (song: Song, time: TimeInterval)? {
-        guard let song = currentSong else { return nil }
+        guard let song = currentTrack?.song else { return nil }
         return (song, playbackTime)
+    }
+
+    func getCurrentTrackInfo() -> (track: PlayableTrack, time: TimeInterval)? {
+        guard let track = currentTrack else { return nil }
+        return (track, playbackTime)
     }
 
     // MARK: - Diagnostics
@@ -831,7 +855,8 @@ class MusicKitService: ObservableObject {
         logger.info("App queue entries: \(self.player.queue.entries.count)")
         logger.info("App current entry: \(self.player.queue.currentEntry == nil ? "nil" : "exists")")
         logger.info("--- Combined State ---")
-        logger.info("Current song: \(self.currentSong?.title ?? "nil")")
+        logger.info("Current track: \(self.currentTrack?.title ?? "nil")")
+        logger.info("Current track type: \(self.currentTrack?.isAppleMusic == true ? "Apple Music" : (self.currentTrack?.isLocal == true ? "Local" : "Unknown"))")
         logger.info("Playback time: \(self.playbackTime)")
         logger.info("Playback duration: \(self.playbackDuration)")
         logger.info("=========================")
@@ -839,11 +864,9 @@ class MusicKitService: ObservableObject {
 
     // MARK: - Color Extraction
 
-    private func extractColorsFromArtwork(for song: Song?) async {
-        guard let song = song,
-              let artwork = song.artwork,
-              let url = artwork.url(width: 300, height: 300) else {
-            // Reset to default colors if no artwork
+    private func extractColorsFromArtwork(for track: PlayableTrack?) async {
+        guard let track = track else {
+            // Reset to default colors if no track
             backgroundColor1 = .purple.opacity(0.3)
             backgroundColor2 = .blue.opacity(0.3)
             meshColors = nil
@@ -851,36 +874,64 @@ class MusicKitService: ObservableObject {
             return
         }
 
-        do {
-            // Download the artwork image
-            let (data, _) = try await URLSession.shared.data(from: url)
-            guard let image = UIImage(data: data) else { return }
+        // Get UIImage from artwork based on track type
+        var artworkImage: UIImage?
 
-            // Extract comprehensive color palette
-            if let palette = await ColorExtractor.extractColorPalette(from: image) {
-                // Update colors on main actor with animation
-                backgroundColor1 = Color(uiColor: palette.backgroundColors.color1)
-                backgroundColor2 = Color(uiColor: palette.backgroundColors.color2)
-
-                // Update mesh colors for visualizations (using vibrant colors)
-                meshColors = palette.vibrantMeshColors.map { Color(uiColor: $0) }
-
-                // Update background mesh colors (using base mesh colors, darkened)
-                backgroundMeshColors = palette.meshColors.map {
-                    Color(uiColor: $0)
-                        .opacity(0.3)
-                }
-            } else {
-                // Fallback to old method if palette extraction fails
-                if let colors = await ColorExtractor.extractColors(from: image) {
-                    backgroundColor1 = Color(uiColor: colors.color1)
-                    backgroundColor2 = Color(uiColor: colors.color2)
-                }
+        switch track.artwork {
+        case .musicKit(let artwork):
+            // For Apple Music tracks, download the artwork
+            guard let url = artwork?.url(width: 300, height: 300) else {
+                resetToDefaultColors()
+                return
             }
-        } catch {
-            // If extraction fails, keep current colors
-            logger.error("Failed to extract colors from artwork: \(error.localizedDescription)")
+
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                artworkImage = UIImage(data: data)
+            } catch {
+                logger.error("Failed to download artwork: \(error.localizedDescription)")
+                resetToDefaultColors()
+                return
+            }
+
+        case .mediaPlayer(let artwork):
+            // For local tracks, get the image directly from MPMediaItemArtwork
+            artworkImage = artwork?.image(at: CGSize(width: 300, height: 300))
         }
+
+        guard let image = artworkImage else {
+            resetToDefaultColors()
+            return
+        }
+
+        // Extract comprehensive color palette
+        if let palette = await ColorExtractor.extractColorPalette(from: image) {
+            // Update colors on main actor with animation
+            backgroundColor1 = Color(uiColor: palette.backgroundColors.color1)
+            backgroundColor2 = Color(uiColor: palette.backgroundColors.color2)
+
+            // Update mesh colors for visualizations (using vibrant colors)
+            meshColors = palette.vibrantMeshColors.map { Color(uiColor: $0) }
+
+            // Update background mesh colors (using base mesh colors, darkened)
+            backgroundMeshColors = palette.meshColors.map {
+                Color(uiColor: $0)
+                    .opacity(0.3)
+            }
+        } else {
+            // Fallback to old method if palette extraction fails
+            if let colors = await ColorExtractor.extractColors(from: image) {
+                backgroundColor1 = Color(uiColor: colors.color1)
+                backgroundColor2 = Color(uiColor: colors.color2)
+            }
+        }
+    }
+
+    private func resetToDefaultColors() {
+        backgroundColor1 = .purple.opacity(0.3)
+        backgroundColor2 = .blue.opacity(0.3)
+        meshColors = nil
+        backgroundMeshColors = nil
     }
 }
 

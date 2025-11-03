@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import MusicKit
+import MediaPlayer
 import NukeUI
 
 struct FloatingNowPlayingBar: View {
@@ -18,42 +19,45 @@ struct FloatingNowPlayingBar: View {
     let onTap: () -> Void
 
     private var currentMarkedSong: MarkedSong? {
-        guard let song = musicService.currentSong else { return nil }
-        return markedSongs.first { $0.appleMusicID == song.id.rawValue }
+        guard let track = musicService.currentTrack else { return nil }
+        if let appleStoreID = track.appleStoreID {
+            return markedSongs.first { $0.appleMusicID == appleStoreID }
+        } else if let persistentID = track.persistentID {
+            return markedSongs.first { $0.persistentID == persistentID }
+        }
+        return nil
     }
 
     var body: some View {
         HStack(spacing: 12) {
-            // Artwork - show pulsating gradient when loading, pending song, or current song
+            // Artwork - show pulsating gradient when loading, pending track, or current track
             Group {
                 if musicService.isLoadingSong {
                     PulsatingGradientView()
-                } else if let song = musicService.currentSong ?? musicService.pendingSong {
-                    if let artwork = song.artwork,
-                       let artworkURL = artwork.url(width: 50, height: 50) {
-                        LazyImage(url: artworkURL) { state in
-                            if let image = state.image {
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                            } else {
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(.ultraThinMaterial)
-                                    .overlay {
-                                        Image(systemName: "music.note")
-                                            .foregroundStyle(.secondary)
-                                            .font(.caption)
-                                    }
+                } else if let track = musicService.currentTrack ?? musicService.pendingTrack {
+                    switch track.artwork {
+                    case .musicKit(let artwork):
+                        if let artworkURL = artwork?.url(width: 50, height: 50) {
+                            LazyImage(url: artworkURL) { state in
+                                if let image = state.image {
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                } else {
+                                    placeholderArtwork
+                                }
                             }
+                        } else {
+                            placeholderArtwork
                         }
-                    } else {
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(.ultraThinMaterial)
-                            .overlay {
-                                Image(systemName: "music.note")
-                                    .foregroundStyle(.secondary)
-                                    .font(.caption)
-                            }
+                    case .mediaPlayer(let artwork):
+                        if let uiImage = artwork?.image(at: CGSize(width: 50, height: 50)) {
+                            Image(uiImage: uiImage)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        } else {
+                            placeholderArtwork
+                        }
                     }
                 } else {
                     // Nothing playing state
@@ -70,15 +74,15 @@ struct FloatingNowPlayingBar: View {
             .cornerRadius(6)
 
             // Song info with marquee or "Nothing Playing"
-            if let song = musicService.currentSong ?? musicService.pendingSong {
+            if let track = musicService.currentTrack ?? musicService.pendingTrack {
                 VStack(alignment: .leading, spacing: 2) {
                     MarqueeText(
-                        text: song.title,
+                        text: track.title,
                         font: .subheadline.weight(.semibold)
                     )
                     .frame(height: 18)
 
-                    Text(song.artistName)
+                    Text(track.artistName)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -98,8 +102,8 @@ struct FloatingNowPlayingBar: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            // Play/Pause button - only show when song is loaded
-            if musicService.currentSong != nil {
+            // Play/Pause button - only show when track is loaded
+            if musicService.currentTrack != nil {
                 Button {
                     let generator = UISelectionFeedbackGenerator()
                     generator.selectionChanged()
@@ -137,14 +141,24 @@ struct FloatingNowPlayingBar: View {
         .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
         .contentShape(Rectangle())
         .onTapGesture {
-            // Only allow tapping to view now playing if song is loaded
-            if musicService.currentSong != nil {
+            // Only allow tapping to view now playing if track is loaded
+            if musicService.currentTrack != nil {
                 onTap()
             }
         }
     }
 
     // MARK: - Helper Methods
+
+    private var placeholderArtwork: some View {
+        RoundedRectangle(cornerRadius: 6)
+            .fill(.ultraThinMaterial)
+            .overlay {
+                Image(systemName: "music.note")
+                    .foregroundStyle(.secondary)
+                    .font(.caption)
+            }
+    }
 
     private func findNextMarker() -> SongMarker? {
         guard let markers = currentMarkedSong?.sortedMarkers else { return nil }
@@ -175,8 +189,9 @@ struct FloatingNowPlayingBar: View {
                     try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
 
                     // Check if the new song has markers
-                    if let currentSong = musicService.currentSong,
-                       let newMarkedSong = markedSongs.first(where: { $0.appleMusicID == currentSong.id.rawValue }),
+                    if let currentTrack = musicService.currentTrack,
+                       let id = currentTrack.appleStoreID ?? currentTrack.persistentID,
+                       let newMarkedSong = markedSongs.first(where: { $0.appleMusicID == id || $0.persistentID == id }),
                        let firstMarker = newMarkedSong.sortedMarkers.first {
                         // Navigate to the first marker of the new song
                         let startTime = max(0, firstMarker.timestamp - defaultCueTime)

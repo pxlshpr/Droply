@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import MusicKit
+import MediaPlayer
 import NukeUI
 
 struct NowPlayingView: View {
@@ -44,7 +45,7 @@ struct NowPlayingView: View {
     // Detect if running in simulator or preview
     private var isPreview: Bool {
         #if targetEnvironment(simulator)
-        return musicService.currentSong == nil && !markedSongs.isEmpty
+        return musicService.currentTrack == nil && !markedSongs.isEmpty
         #else
         return false
         #endif
@@ -83,7 +84,7 @@ struct NowPlayingView: View {
                             .foregroundStyle(.white.opacity(0.8))
                     }
                     .padding(.horizontal)
-                } else if let song = musicService.currentSong ?? musicService.pendingSong, !isPreview {
+                } else if let track = musicService.currentTrack ?? musicService.pendingTrack, !isPreview {
                     // Calculate available space accounting for safe areas
                     let bottomSafeArea = max(geometry.safeAreaInsets.bottom, 20) // Minimum 20pt padding
                     let availableHeight = geometry.size.height - bottomSafeArea
@@ -113,21 +114,21 @@ struct NowPlayingView: View {
 
                     VStack(spacing: 0) {
                         // Album artwork
-                        albumArtwork(for: song)
+                        albumArtwork(for: track)
                             .frame(width: artworkSize, height: artworkSize)
                             .padding(.horizontal, 16)
                             .padding(.bottom, 16)
 
                         // Song info
                         VStack(spacing: 2) {
-                            Text(song.title)
+                            Text(track.title)
                                 .font(.title3)
                                 .fontWeight(.bold)
                                 .multilineTextAlignment(.center)
                                 .foregroundStyle(.white)
                                 .lineLimit(1)
 
-                            Text(song.artistName)
+                            Text(track.artistName)
                                 .font(.subheadline)
                                 .foregroundStyle(.white.opacity(0.8))
                                 .lineLimit(1)
@@ -629,18 +630,18 @@ struct NowPlayingView: View {
             .toolbarBackground(.visible, for: .bottomBar)
             .sheet(isPresented: $showingAddMarker, onDismiss: {
                 // Refresh markedSong after adding a marker
-                updateMarkedSong(for: musicService.currentSong)
+                updateMarkedSong(for: musicService.currentTrack)
             }) {
-                if let song = musicService.currentSong {
+                if let track = musicService.currentTrack {
                     AddMarkerView(
                         currentTime: musicService.playbackTime,
-                        markedSong: getOrCreateMarkedSong(from: song)
+                        markedSong: getOrCreateMarkedSong(from: track)
                     )
                 }
             }
             .sheet(isPresented: $showingEditMarker, onDismiss: {
                 // Refresh markedSong after editing a marker
-                updateMarkedSong(for: musicService.currentSong)
+                updateMarkedSong(for: musicService.currentTrack)
             }) {
                 if let marker = markerToEdit {
                     EditMarkerView(marker: marker)
@@ -705,12 +706,12 @@ struct NowPlayingView: View {
                 .presentationBackground(.ultraThinMaterial)
                 .animation(.spring(response: 0.3), value: loopModeEnabled)
             }
-            .onChange(of: musicService.currentSong) { _, newSong in
-                updateMarkedSong(for: newSong)
+            .onChange(of: musicService.currentTrack) { _, newTrack in
+                updateMarkedSong(for: newTrack)
             }
             .onAppear {
                 migrateLegacySongs()
-                updateMarkedSong(for: musicService.currentSong)
+                updateMarkedSong(for: musicService.currentTrack)
                 cueManager.setup(musicService: musicService)
             }
             .fullScreenCover(isPresented: $cueManager.showFullscreenVisualization) {
@@ -732,37 +733,52 @@ struct NowPlayingView: View {
     // MARK: - Views
 
     @ViewBuilder
-    private func albumArtwork(for song: Song) -> some View {
+    private func albumArtwork(for track: PlayableTrack) -> some View {
         GeometryReader { geo in
-            if let artwork = song.artwork,
-               let artworkURL = artwork.url(width: Int(geo.size.width), height: Int(geo.size.height)) {
-                LazyImage(url: artworkURL) { state in
-                    if let image = state.image {
-                        image
+            Group {
+                switch track.artwork {
+                case .musicKit(let artwork):
+                    // For Apple Music tracks, use LazyImage with URL
+                    if let artworkURL = artwork?.url(width: Int(geo.size.width), height: Int(geo.size.height)) {
+                        LazyImage(url: artworkURL) { state in
+                            if let image = state.image {
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                            } else {
+                                placeholderArtwork(size: geo.size.width)
+                            }
+                        }
+                        .cornerRadius(12)
+                        .shadow(radius: 10)
+                    } else {
+                        placeholderArtwork(size: geo.size.width)
+                    }
+
+                case .mediaPlayer(let artwork):
+                    // For local tracks, use the UIImage directly
+                    if let uiImage = artwork?.image(at: CGSize(width: geo.size.width, height: geo.size.height)) {
+                        Image(uiImage: uiImage)
                             .resizable()
                             .aspectRatio(contentMode: .fill)
+                            .cornerRadius(12)
+                            .shadow(radius: 10)
                     } else {
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(.ultraThinMaterial)
-                            .overlay {
-                                Image(systemName: "music.note")
-                                    .font(.system(size: geo.size.width * 0.28))
-                                    .foregroundStyle(.secondary)
-                            }
+                        placeholderArtwork(size: geo.size.width)
                     }
                 }
-                .cornerRadius(12)
-                .shadow(radius: 10)
-            } else {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(.ultraThinMaterial)
-                    .overlay {
-                        Image(systemName: "music.note")
-                            .font(.system(size: geo.size.width * 0.28))
-                            .foregroundStyle(.secondary)
-                    }
             }
         }
+    }
+
+    private func placeholderArtwork(size: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: 12)
+            .fill(.ultraThinMaterial)
+            .overlay {
+                Image(systemName: "music.note")
+                    .font(.system(size: size * 0.28))
+                    .foregroundStyle(.secondary)
+            }
     }
 
     private var cueTimeSelector: some View {
@@ -830,8 +846,9 @@ struct NowPlayingView: View {
                     try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
 
                     // Check if the new song has markers
-                    if let currentSong = musicService.currentSong,
-                       let newMarkedSong = markedSongs.first(where: { $0.appleMusicID == currentSong.id.rawValue }),
+                    if let currentTrack = musicService.currentTrack,
+                       let id = currentTrack.appleStoreID ?? currentTrack.persistentID,
+                       let newMarkedSong = markedSongs.first(where: { $0.appleMusicID == id || $0.persistentID == id }),
                        let lastMarker = newMarkedSong.sortedMarkers.last {
                         // Navigate to the last marker of the new song
                         let startTime = max(0, lastMarker.timestamp - defaultCueTime)
@@ -871,8 +888,9 @@ struct NowPlayingView: View {
                     try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
 
                     // Check if the new song has markers
-                    if let currentSong = musicService.currentSong,
-                       let newMarkedSong = markedSongs.first(where: { $0.appleMusicID == currentSong.id.rawValue }),
+                    if let currentTrack = musicService.currentTrack,
+                       let id = currentTrack.appleStoreID ?? currentTrack.persistentID,
+                       let newMarkedSong = markedSongs.first(where: { $0.appleMusicID == id || $0.persistentID == id }),
                        let firstMarker = newMarkedSong.sortedMarkers.first {
                         // Navigate to the first marker of the new song
                         let startTime = max(0, firstMarker.timestamp - defaultCueTime)
@@ -908,21 +926,35 @@ struct NowPlayingView: View {
         }
     }
 
-    private func updateMarkedSong(for song: Song?) {
-        guard let song = song else {
+    private func updateMarkedSong(for track: PlayableTrack?) {
+        guard let track = track else {
             markedSong = nil
             return
         }
 
-        markedSong = markedSongs.first { $0.appleMusicID == song.id.rawValue }
+        // Try to find marked song by Apple Music ID or persistent ID
+        if let appleStoreID = track.appleStoreID {
+            markedSong = markedSongs.first { $0.appleMusicID == appleStoreID }
+        } else if let persistentID = track.persistentID {
+            markedSong = markedSongs.first { $0.persistentID == persistentID }
+        } else {
+            markedSong = nil
+        }
     }
 
-    private func getOrCreateMarkedSong(from song: Song) -> MarkedSong {
-        if let existing = markedSongs.first(where: { $0.appleMusicID == song.id.rawValue }) {
+    private func getOrCreateMarkedSong(from track: PlayableTrack) -> MarkedSong {
+        // Try to find existing by Apple Music ID or persistent ID
+        if let appleStoreID = track.appleStoreID,
+           let existing = markedSongs.first(where: { $0.appleMusicID == appleStoreID }) {
             return existing
         }
 
-        let newMarkedSong = MarkedSong(from: song)
+        if let persistentID = track.persistentID,
+           let existing = markedSongs.first(where: { $0.persistentID == persistentID }) {
+            return existing
+        }
+
+        let newMarkedSong = MarkedSong(from: track)
         modelContext.insert(newMarkedSong)
         try? modelContext.save()
         return newMarkedSong
