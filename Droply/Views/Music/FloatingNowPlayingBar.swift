@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import MusicKit
+import NukeUI
 
 struct FloatingNowPlayingBar: View {
     @ObservedObject private var musicService = MusicKitService.shared
@@ -28,8 +29,23 @@ struct FloatingNowPlayingBar: View {
                 if musicService.isLoadingSong {
                     PulsatingGradientView()
                 } else if let song = musicService.currentSong ?? musicService.pendingSong {
-                    if let artwork = song.artwork {
-                        ArtworkImage(artwork, width: 50, height: 50)
+                    if let artwork = song.artwork,
+                       let artworkURL = artwork.url(width: 50, height: 50) {
+                        LazyImage(url: artworkURL) { state in
+                            if let image = state.image {
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                            } else {
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(.ultraThinMaterial)
+                                    .overlay {
+                                        Image(systemName: "music.note")
+                                            .foregroundStyle(.secondary)
+                                            .font(.caption)
+                                    }
+                            }
+                        }
                     } else {
                         RoundedRectangle(cornerRadius: 6)
                             .fill(.ultraThinMaterial)

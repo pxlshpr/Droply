@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import MusicKit
+import NukeUI
 
 struct NowPlayingView: View {
     @Environment(\.modelContext) private var modelContext
@@ -733,10 +734,25 @@ struct NowPlayingView: View {
     @ViewBuilder
     private func albumArtwork(for song: Song) -> some View {
         GeometryReader { geo in
-            if let artwork = song.artwork {
-                ArtworkImage(artwork, width: geo.size.width, height: geo.size.height)
-                    .cornerRadius(12)
-                    .shadow(radius: 10)
+            if let artwork = song.artwork,
+               let artworkURL = artwork.url(width: Int(geo.size.width), height: Int(geo.size.height)) {
+                LazyImage(url: artworkURL) { state in
+                    if let image = state.image {
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } else {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(.ultraThinMaterial)
+                            .overlay {
+                                Image(systemName: "music.note")
+                                    .font(.system(size: geo.size.width * 0.28))
+                                    .foregroundStyle(.secondary)
+                            }
+                    }
+                }
+                .cornerRadius(12)
+                .shadow(radius: 10)
             } else {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(.ultraThinMaterial)
