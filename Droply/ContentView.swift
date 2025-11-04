@@ -15,6 +15,10 @@ import OSLog
 struct SongRowButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            .background(
+                Rectangle()
+                    .fill(.white.opacity(configuration.isPressed ? 0.2 : 0))
+            )
             .opacity(configuration.isPressed ? 0.6 : 1.0)
             .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
             .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
@@ -94,7 +98,7 @@ struct ContentView: View {
                                             // Haptic feedback FIRST for instant tactile response
                                             let hapticTime = timestamp()
                                             logger.debug("[\(hapticTime)] 📳 Triggering haptic feedback...")
-                                            let generator = UIImpactFeedbackGenerator(style: .light)
+                                            let generator = UIImpactFeedbackGenerator(style: .heavy)
                                             generator.impactOccurred()
 
                                             // Extract metadata from SwiftData synchronously (on main thread)

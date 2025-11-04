@@ -154,8 +154,8 @@ struct FloatingNowPlayingBar: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            // Play/Pause button - only show when track is loaded
-            if musicService.currentTrack != nil {
+            // Play/Pause button - show when track is loaded or pending
+            if musicService.currentTrack != nil || musicService.pendingTrack != nil {
                 Button {
                     let generator = UISelectionFeedbackGenerator()
                     generator.selectionChanged()
