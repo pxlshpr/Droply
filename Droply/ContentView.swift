@@ -31,10 +31,9 @@ struct ContentView: View {
     @State private var showingAuthorization = false
     @State private var showingNowPlaying = false
     @State private var currentPlayTask: Task<Void, Never>?
-    @State private var showingError = false
-    @State private var errorMessage = ""
 
     private let logger = Logger(subsystem: "com.droply.app", category: "ContentView")
+    private let playbackErrorLogger = Logger(subsystem: "com.droply.app", category: "PlaybackErrors")
 
     private func timestamp() -> String {
         let formatter = DateFormatter()
@@ -200,11 +199,6 @@ struct ContentView: View {
             .sheet(isPresented: $showingNowPlaying) {
                 NowPlayingView()
             }
-            .alert("Playback Error", isPresented: $showingError) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                Text(errorMessage)
-            }
         }
     }
 
@@ -355,8 +349,7 @@ struct ContentView: View {
 
             guard !items.isEmpty else {
                 print("❌ No songs found to play")
-                errorMessage = "Could not find '\(markedSong.title)' by \(markedSong.artist). Please check your library and Apple Music subscription."
-                showingError = true
+                playbackErrorLogger.error("Could not find '\(markedSong.title)' by \(markedSong.artist). Please check your library and Apple Music subscription.")
                 return
             }
 
@@ -394,8 +387,7 @@ struct ContentView: View {
             print("⏸️ Play song task was cancelled")
         } catch {
             print("❌ Failed to play song: \(error.localizedDescription)")
-            errorMessage = "Failed to play '\(markedSong.title)' by \(markedSong.artist): \(error.localizedDescription)"
-            showingError = true
+            playbackErrorLogger.error("Failed to play '\(markedSong.title)' by \(markedSong.artist): \(error.localizedDescription)")
         }
     }
 

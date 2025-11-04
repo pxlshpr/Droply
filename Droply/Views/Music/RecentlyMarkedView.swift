@@ -10,6 +10,7 @@ import SwiftData
 import MusicKit
 import MediaPlayer
 import NukeUI
+import OSLog
 
 struct RecentlyMarkedView: View {
     let namespace: Namespace.ID
@@ -18,6 +19,8 @@ struct RecentlyMarkedView: View {
     @Environment(\.dismiss) private var dismiss
     private let musicService = MusicKitService.shared
     @State private var currentPlayTask: Task<Void, Never>?
+
+    private let playbackErrorLogger = Logger(subsystem: "com.droply.app", category: "PlaybackErrors")
 
     @Query(
         filter: #Predicate<MarkedSong> { song in
@@ -277,7 +280,7 @@ struct RecentlyMarkedView: View {
             // Task was cancelled - this is expected when user taps another song quickly
             print("Play song task was cancelled")
         } catch {
-            print("Failed to play song: \(error.localizedDescription)")
+            playbackErrorLogger.error("Failed to play song: \(error.localizedDescription)")
         }
     }
 
@@ -353,7 +356,7 @@ struct RecentlyMarkedView: View {
             }
             try? modelContext.save()
         } catch {
-            print("Failed to play songs: \(error.localizedDescription)")
+            playbackErrorLogger.error("Failed to play songs: \(error.localizedDescription)")
         }
     }
 
