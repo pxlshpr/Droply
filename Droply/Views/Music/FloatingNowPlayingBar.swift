@@ -58,6 +58,20 @@ struct FloatingNowPlayingBar: View {
                         } else {
                             placeholderArtwork
                         }
+                    case .cachedURL(let urlString):
+                        if let urlString = urlString, let artworkURL = URL(string: urlString) {
+                            LazyImage(url: artworkURL) { state in
+                                if let image = state.image {
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                } else {
+                                    placeholderArtwork
+                                }
+                            }
+                        } else {
+                            placeholderArtwork
+                        }
                     }
                 } else {
                     // Nothing playing state

@@ -78,6 +78,12 @@ struct ContentView: View {
                                                 let generator = UIImpactFeedbackGenerator(style: .light)
                                                 generator.impactOccurred()
 
+                                                // Load full track metadata immediately (independent of queueing)
+                                                // This ensures UI updates with real track data ASAP
+                                                Task {
+                                                    await musicService.loadTrackMetadata(from: song)
+                                                }
+
                                                 // Cancel any existing play task
                                                 currentPlayTask?.cancel()
 

@@ -496,6 +496,87 @@ class MusicKitService: ObservableObject {
         pendingMarkedSong = nil
     }
 
+    /// Immediately load and set track metadata from a MarkedSong
+    /// This runs independently of playback operations to ensure instant UI updates
+    /// Uses cached SwiftData first (instant!), then fetches fresh data in background
+    public func loadTrackMetadata(from markedSong: MarkedSong) async {
+        logger.info("Loading track metadata immediately for: \(markedSong.title)")
+
+        // PHASE 1 (INSTANT): Load from cached SwiftData
+        // Create PlayableTrack from cached data - zero API delay!
+        let cachedTrack = PlayableTrack(cachedFrom: markedSong)
+        setPendingMarkedSong(markedSong)
+        setPendingTrack(cachedTrack)
+        playbackDuration = markedSong.duration
+        logger.info("✅ Instantly loaded cached track metadata: \(markedSong.title)")
+
+        // PHASE 2 (BACKGROUND): Fetch fresh data from API
+        // Run in separate task to not block UI
+        Task { @MainActor in
+            do {
+                if markedSong.isAppleMusic {
+                    // Fetch from Apple Music catalog
+                    let request = MusicCatalogResourceRequest<Song>(
+                        matching: \.id,
+                        equalTo: MusicItemID(markedSong.appleMusicID)
+                    )
+                    let response = try await request.response()
+
+                    if let song = response.items.first {
+                        // Only update if this track is still the pending/current track (avoid race conditions)
+                        if pendingTrack?.id == cachedTrack.id || currentTrack?.id == cachedTrack.id {
+                            let freshTrack = PlayableTrack(song: song)
+                            if pendingTrack?.id == cachedTrack.id {
+                                setPendingTrack(freshTrack)
+                            }
+                            if currentTrack?.id == cachedTrack.id {
+                                currentTrack = freshTrack
+                            }
+                            playbackDuration = song.duration ?? 0
+                            logger.info("✅ Updated with fresh Apple Music track metadata: \(song.title)")
+                        } else {
+                            logger.debug("Skipped updating track metadata - user switched to different track")
+                        }
+                    } else {
+                        logger.warning("Could not find Apple Music track for: \(markedSong.title)")
+                    }
+                } else if markedSong.isLocal {
+                    // Look up local track by persistent ID
+                    if let persistentIDString = markedSong.persistentID.isEmpty ? nil : markedSong.persistentID,
+                       let persistentID = UInt64(persistentIDString) {
+                        let query = MPMediaQuery.songs()
+                        let predicate = MPMediaPropertyPredicate(
+                            value: persistentID,
+                            forProperty: MPMediaItemPropertyPersistentID
+                        )
+                        query.addFilterPredicate(predicate)
+
+                        if let mediaItem = query.items?.first {
+                            // Only update if this track is still the pending/current track
+                            if pendingTrack?.id == cachedTrack.id || currentTrack?.id == cachedTrack.id {
+                                let freshTrack = PlayableTrack(mediaItem: mediaItem)
+                                if pendingTrack?.id == cachedTrack.id {
+                                    setPendingTrack(freshTrack)
+                                }
+                                if currentTrack?.id == cachedTrack.id {
+                                    currentTrack = freshTrack
+                                }
+                                playbackDuration = mediaItem.playbackDuration
+                                logger.info("✅ Updated with fresh local track metadata: \(freshTrack.title)")
+                            } else {
+                                logger.debug("Skipped updating track metadata - user switched to different track")
+                            }
+                        } else {
+                            logger.warning("Could not find local track for: \(markedSong.title)")
+                        }
+                    }
+                }
+            } catch {
+                logger.error("Failed to fetch fresh track metadata: \(error.localizedDescription)")
+            }
+        }
+    }
+
     private func setPendingTrack(_ track: PlayableTrack) {
         logger.debug("Setting pending track: \(track.title)")
 
@@ -916,6 +997,22 @@ class MusicKitService: ObservableObject {
         case .mediaPlayer(let artwork):
             // For local tracks, get the image directly from MPMediaItemArtwork
             artworkImage = artwork?.image(at: CGSize(width: 300, height: 300))
+
+        case .cachedURL(let urlString):
+            // For cached tracks, download the artwork from the cached URL
+            guard let urlString = urlString, let url = URL(string: urlString) else {
+                resetToDefaultColors()
+                return
+            }
+
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                artworkImage = UIImage(data: data)
+            } catch {
+                logger.error("Failed to download cached artwork: \(error.localizedDescription)")
+                resetToDefaultColors()
+                return
+            }
         }
 
         guard let image = artworkImage else {

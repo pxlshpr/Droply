@@ -8,6 +8,7 @@
 import Foundation
 import MediaPlayer
 import MusicKit
+import SwiftData
 
 /// Represents a track that can be played, supporting both Apple Music catalog tracks and local synced tracks
 public struct PlayableTrack: Identifiable, Hashable {
@@ -33,18 +34,26 @@ public struct PlayableTrack: Identifiable, Hashable {
 
     /// Get the Apple Music store ID if available
     public var appleStoreID: String? {
-        if case .appleMusic(_, let storeID) = source {
+        switch source {
+        case .appleMusic(_, let storeID):
             return storeID
+        case .cached(.appleMusic, let id):
+            return id
+        default:
+            return nil
         }
-        return nil
     }
 
     /// Get the persistent ID if this is a local track
     public var persistentID: String? {
-        if case .local(_, let persistentID) = source {
+        switch source {
+        case .local(_, let persistentID):
             return String(persistentID)
+        case .cached(.local, let id):
+            return id
+        default:
+            return nil
         }
-        return nil
     }
 
     /// Get the underlying MusicKit Song if available
@@ -66,6 +75,12 @@ public struct PlayableTrack: Identifiable, Hashable {
     public enum TrackSource: Hashable {
         case appleMusic(Song, storeID: String)
         case local(MPMediaItem, persistentID: UInt64)
+        case cached(type: CachedTrackType, id: String)
+
+        public enum CachedTrackType: Hashable {
+            case appleMusic
+            case local
+        }
 
         public static func == (lhs: TrackSource, rhs: TrackSource) -> Bool {
             switch (lhs, rhs) {
@@ -73,6 +88,8 @@ public struct PlayableTrack: Identifiable, Hashable {
                 return lhsID == rhsID
             case (.local(_, let lhsID), .local(_, let rhsID)):
                 return lhsID == rhsID
+            case (.cached(let lhsType, let lhsID), .cached(let rhsType, let rhsID)):
+                return lhsType == rhsType && lhsID == rhsID
             default:
                 return false
             }
@@ -86,6 +103,10 @@ public struct PlayableTrack: Identifiable, Hashable {
             case .local(_, let persistentID):
                 hasher.combine("local")
                 hasher.combine(persistentID)
+            case .cached(let type, let id):
+                hasher.combine("cached")
+                hasher.combine(type)
+                hasher.combine(id)
             }
         }
     }
@@ -124,6 +145,24 @@ extension PlayableTrack {
         self.artwork = .mediaPlayer(mediaItem.artwork)
         self.source = .local(mediaItem, persistentID: mediaItem.persistentID)
     }
+
+    /// Create a PlayableTrack from cached MarkedSong data (instant, no API calls)
+    /// This enables immediate UI updates while full track data is fetched in background
+    init(cachedFrom markedSong: MarkedSong) {
+        if markedSong.isAppleMusic {
+            self.id = markedSong.appleMusicID
+            self.source = .cached(type: .appleMusic, id: markedSong.appleMusicID)
+        } else {
+            self.id = markedSong.persistentID
+            self.source = .cached(type: .local, id: markedSong.persistentID)
+        }
+
+        self.title = markedSong.title
+        self.artistName = markedSong.artist
+        self.albumTitle = markedSong.albumTitle
+        self.duration = markedSong.duration
+        self.artwork = .cachedURL(markedSong.artworkURL)
+    }
 }
 
 // MARK: - Artwork Wrapper
@@ -132,13 +171,18 @@ extension PlayableTrack {
 public enum TrackArtwork: Hashable {
     case musicKit(MusicKit.Artwork?)
     case mediaPlayer(MPMediaItemArtwork?)
+    case cachedURL(String?) // For cached tracks with only artwork URL
 
-    /// Get artwork URL for MusicKit artwork
+    /// Get artwork URL for MusicKit artwork or cached URL
     public func url(width: Int, height: Int) -> URL? {
-        if case .musicKit(let artwork) = self {
+        switch self {
+        case .musicKit(let artwork):
             return artwork?.url(width: width, height: height)
+        case .cachedURL(let urlString):
+            return urlString.flatMap { URL(string: $0) }
+        default:
+            return nil
         }
-        return nil
     }
 
     /// Get UIImage for MediaPlayer artwork
@@ -156,6 +200,8 @@ public enum TrackArtwork: Hashable {
             return artwork != nil
         case .mediaPlayer(let artwork):
             return artwork != nil
+        case .cachedURL(let url):
+            return url != nil
         }
     }
 
@@ -166,6 +212,8 @@ public enum TrackArtwork: Hashable {
         case (.mediaPlayer, .mediaPlayer):
             // MPMediaItemArtwork doesn't conform to Equatable, so we just check both are mediaPlayer
             return true
+        case (.cachedURL(let lhsURL), .cachedURL(let rhsURL)):
+            return lhsURL == rhsURL
         default:
             return false
         }
@@ -178,6 +226,9 @@ public enum TrackArtwork: Hashable {
             hasher.combine(artwork)
         case .mediaPlayer:
             hasher.combine("mediaPlayer")
+        case .cachedURL(let url):
+            hasher.combine("cachedURL")
+            hasher.combine(url)
         }
     }
 }

@@ -801,6 +801,26 @@ struct NowPlayingView: View {
                     } else {
                         placeholderArtwork(size: geo.size.width)
                     }
+
+                case .cachedURL(let urlString):
+                    // For cached tracks, use LazyImage with URL string
+                    if let urlString = urlString, let artworkURL = URL(string: urlString) {
+                        LazyImage(url: artworkURL) { state in
+                            if let image = state.image {
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: geo.size.width, height: geo.size.width)
+                                    .clipped()
+                            } else {
+                                placeholderArtwork(size: geo.size.width)
+                            }
+                        }
+                        .cornerRadius(12)
+                        .shadow(radius: 10)
+                    } else {
+                        placeholderArtwork(size: geo.size.width)
+                    }
                 }
             }
         }
