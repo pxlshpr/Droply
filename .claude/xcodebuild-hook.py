@@ -25,7 +25,7 @@ def main():
                 # Handle both quoted and unquoted destinations
                 command = re.sub(
                     r'-destination\s+["\']?[^"\']*["\']?',
-                    f"-destination '{correct_destination}'",
+                    "-destination '" + correct_destination + "'",
                     command
                 )
 
@@ -35,7 +35,7 @@ def main():
                     "updatedInput": {
                         "command": command
                     },
-                    "message": f"✓ Modified xcodebuild to use iPhone 17 Pro simulator"
+                    "message": "✓ Modified xcodebuild to use iPhone 17 Pro simulator"
                 }
                 print(json.dumps(result))
                 return
@@ -43,21 +43,29 @@ def main():
             # Add the destination flag if it's missing
             # Insert it after xcodebuild and any scheme flags
             if "-scheme" in command:
-                command = re.sub(
-                    r'(-scheme\s+\S+)',
-                    rf'\1 -destination \'{correct_destination}\'',
-                    command
-                )
+                # Find the -scheme argument and add destination after it
+                parts = command.split()
+                new_parts = []
+                i = 0
+                while i < len(parts):
+                    new_parts.append(parts[i])
+                    if parts[i] == "-scheme" and i + 1 < len(parts):
+                        new_parts.append(parts[i + 1])
+                        i += 1
+                        # Add destination here
+                        new_parts.extend(["-destination", correct_destination])
+                    i += 1
+                command = " ".join(new_parts)
             else:
                 # Just add it after xcodebuild
-                command = command.replace("xcodebuild", f"xcodebuild -destination '{correct_destination}'")
+                command = command.replace("xcodebuild", "xcodebuild -destination '" + correct_destination + "'", 1)
 
             result = {
                 "permissionDecision": "allow",
                 "updatedInput": {
                     "command": command
                 },
-                "message": f"✓ Added iPhone 17 Pro simulator destination to xcodebuild"
+                "message": "✓ Added iPhone 17 Pro simulator destination to xcodebuild"
             }
             print(json.dumps(result))
             return

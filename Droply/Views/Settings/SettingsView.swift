@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @AppStorage("cueVisualizationMode") private var visualizationMode: String = CueVisualizationMode.button.rawValue
     @Environment(\.dismiss) private var dismiss
+    @State private var showingOnboarding = false
 
     var body: some View {
         NavigationStack {
@@ -26,6 +27,17 @@ struct SettingsView: View {
                 } header: {
                     Text("Cue Visualization")
                 }
+
+                Section {
+                    Button {
+                        showingOnboarding = true
+                    } label: {
+                        Label("View Onboarding", systemImage: "questionmark.circle")
+                            .foregroundStyle(.primary)
+                    }
+                } header: {
+                    Text("Help")
+                }
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
@@ -35,6 +47,9 @@ struct SettingsView: View {
                         dismiss()
                     }
                 }
+            }
+            .sheet(isPresented: $showingOnboarding) {
+                OnboardingView()
             }
         }
     }

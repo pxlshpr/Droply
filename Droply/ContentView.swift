@@ -31,6 +31,9 @@ struct ContentView: View {
     @State private var showingAuthorization = false
     @State private var showingNowPlaying = false
     @State private var currentPlayTask: Task<Void, Never>?
+    @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
+    @State private var showingOnboarding = false
+    @State private var showingSettings = false
 
     private let logger = Logger(subsystem: "com.droply.app", category: "ContentView")
     private let playbackErrorLogger = Logger(subsystem: "com.droply.app", category: "PlaybackErrors")
@@ -71,6 +74,14 @@ struct ContentView: View {
         }
         .task {
             await musicService.updateAuthorizationStatus()
+        }
+        .onAppear {
+            if !hasSeenOnboarding {
+                showingOnboarding = true
+            }
+        }
+        .sheet(isPresented: $showingOnboarding) {
+            OnboardingView()
         }
     }
 
@@ -186,18 +197,29 @@ struct ContentView: View {
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        Task {
-                            await playAllSongs()
+                    HStack(spacing: 16) {
+                        Button {
+                            Task {
+                                await playAllSongs()
+                            }
+                        } label: {
+                            Label("Play All", systemImage: "play.fill")
                         }
-                    } label: {
-                        Label("Play All", systemImage: "play.fill")
+                        .disabled(recentlyMarkedSongs.isEmpty)
+
+                        Button {
+                            showingSettings = true
+                        } label: {
+                            Image(systemName: "gear")
+                        }
                     }
-                    .disabled(recentlyMarkedSongs.isEmpty)
                 }
             }
             .sheet(isPresented: $showingNowPlaying) {
                 NowPlayingView()
+            }
+            .sheet(isPresented: $showingSettings) {
+                SettingsView()
             }
         }
     }

@@ -30,6 +30,10 @@ struct NowPlayingView: View {
     @Namespace private var recentlyMarkedNamespace
     @AppStorage("cueVisualizationMode") private var visualizationMode: String = CueVisualizationMode.button.rawValue
 
+    // Error handling
+    @State private var showingErrorAlert = false
+    @State private var errorToShow: PlaybackError?
+
     // Preview state
     @State private var previewCurrentTime: TimeInterval = 75.0
     @State private var previewIsPlaying: Bool = true
@@ -178,20 +182,25 @@ struct NowPlayingView: View {
                                 Task {
                                     let startTime = max(0, marker.timestamp - defaultCueTime)
                                     await musicService.seek(to: startTime)
-                                    try? await musicService.play()
 
-                                    // Start cue visualization
-                                    cueManager.startCue(
-                                        for: marker,
-                                        defaultCueTime: defaultCueTime,
-                                        currentTime: startTime,
-                                        loopEnabled: loopModeEnabled,
-                                        loopDuration: loopDuration
-                                    )
+                                    do {
+                                        try await musicService.play()
 
-                                    // Show fullscreen if that mode is selected
-                                    if currentVisualizationMode == .fullscreen {
-                                        cueManager.showFullscreenVisualization = true
+                                        // Start cue visualization
+                                        cueManager.startCue(
+                                            for: marker,
+                                            defaultCueTime: defaultCueTime,
+                                            currentTime: startTime,
+                                            loopEnabled: loopModeEnabled,
+                                            loopDuration: loopDuration
+                                        )
+
+                                        // Show fullscreen if that mode is selected
+                                        if currentVisualizationMode == .fullscreen {
+                                            cueManager.showFullscreenVisualization = true
+                                        }
+                                    } catch {
+                                        showError(.playbackFailed)
                                     }
                                 }
                             },
@@ -257,7 +266,11 @@ struct NowPlayingView: View {
                                 let generator = UISelectionFeedbackGenerator()
                                 generator.selectionChanged()
                                 Task {
-                                    try? await musicService.skipToPreviousItem()
+                                    do {
+                                        try await musicService.skipToPreviousItem()
+                                    } catch {
+                                        showError(.skipPreviousFailed)
+                                    }
                                 }
                             } label: {
                                 Image(systemName: "backward.fill")
@@ -274,7 +287,11 @@ struct NowPlayingView: View {
                                 let generator = UISelectionFeedbackGenerator()
                                 generator.selectionChanged()
                                 Task {
-                                    try? await musicService.togglePlayPause()
+                                    do {
+                                        try await musicService.togglePlayPause()
+                                    } catch {
+                                        showError(musicService.isPlaying ? .pauseFailed : .playbackFailed)
+                                    }
                                 }
                             } label: {
                                 Image(systemName: musicService.isPlaying ? "pause.circle.fill" : "play.circle.fill")
@@ -291,7 +308,11 @@ struct NowPlayingView: View {
                                 let generator = UISelectionFeedbackGenerator()
                                 generator.selectionChanged()
                                 Task {
-                                    try? await musicService.skipToNextItem()
+                                    do {
+                                        try await musicService.skipToNextItem()
+                                    } catch {
+                                        showError(.skipNextFailed)
+                                    }
                                 }
                             } label: {
                                 Image(systemName: "forward.fill")
@@ -331,16 +352,21 @@ struct NowPlayingView: View {
                                     Task {
                                         let startTime = max(0, marker.timestamp - defaultCueTime)
                                         await musicService.seek(to: startTime)
-                                        try? await musicService.play()
 
-                                        // Start cue visualization
-                                        cueManager.startCue(
-                                            for: marker,
-                                            defaultCueTime: defaultCueTime,
-                                            currentTime: startTime,
-                                            loopEnabled: loopModeEnabled,
-                                            loopDuration: loopDuration
-                                        )
+                                        do {
+                                            try await musicService.play()
+
+                                            // Start cue visualization
+                                            cueManager.startCue(
+                                                for: marker,
+                                                defaultCueTime: defaultCueTime,
+                                                currentTime: startTime,
+                                                loopEnabled: loopModeEnabled,
+                                                loopDuration: loopDuration
+                                            )
+                                        } catch {
+                                            showError(.playbackFailed)
+                                        }
                                     }
                                 },
                                 onMarkerEdit: { marker in
@@ -360,20 +386,25 @@ struct NowPlayingView: View {
                                     Task {
                                         let startTime = max(0, marker.timestamp - defaultCueTime)
                                         await musicService.seek(to: startTime)
-                                        try? await musicService.play()
 
-                                        // Start cue visualization
-                                        cueManager.startCue(
-                                            for: marker,
-                                            defaultCueTime: defaultCueTime,
-                                            currentTime: startTime,
-                                            loopEnabled: loopModeEnabled,
-                                            loopDuration: loopDuration
-                                        )
+                                        do {
+                                            try await musicService.play()
 
-                                        // Show fullscreen if that mode is selected
-                                        if currentVisualizationMode == .fullscreen {
-                                            cueManager.showFullscreenVisualization = true
+                                            // Start cue visualization
+                                            cueManager.startCue(
+                                                for: marker,
+                                                defaultCueTime: defaultCueTime,
+                                                currentTime: startTime,
+                                                loopEnabled: loopModeEnabled,
+                                                loopDuration: loopDuration
+                                            )
+
+                                            // Show fullscreen if that mode is selected
+                                            if currentVisualizationMode == .fullscreen {
+                                                cueManager.showFullscreenVisualization = true
+                                            }
+                                        } catch {
+                                            showError(.playbackFailed)
                                         }
                                     }
                                 },
@@ -758,6 +789,19 @@ struct NowPlayingView: View {
                     )
                 }
             }
+            .alert(
+                errorToShow?.errorDescription ?? "Error",
+                isPresented: $showingErrorAlert,
+                presenting: errorToShow
+            ) { error in
+                Button("OK", role: .cancel) {
+                    errorToShow = nil
+                }
+            } message: { error in
+                if let recoverySuggestion = error.recoverySuggestion {
+                    Text(recoverySuggestion)
+                }
+            }
         }
     }
 
@@ -883,6 +927,15 @@ struct NowPlayingView: View {
 
     // MARK: - Helper Methods
 
+    private func showError(_ error: PlaybackError) {
+        errorToShow = error
+        showingErrorAlert = true
+
+        // Trigger error haptic feedback
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.error)
+    }
+
     private func findPreviousMarker() -> SongMarker? {
         guard let markers = markedSong?.sortedMarkers else { return nil }
         let currentTime = musicService.playbackTime
@@ -904,20 +957,30 @@ struct NowPlayingView: View {
             Task {
                 let startTime = max(0, marker.timestamp - defaultCueTime)
                 await musicService.seek(to: startTime)
-                try? await musicService.play()
+
+                do {
+                    try await musicService.play()
+                } catch {
+                    showError(.playbackFailed)
+                }
             }
         } else {
             // No previous marker found in current song - try to skip to previous song
             Task {
                 do {
                     // Pause first to prevent any playback before we're ready
-                    try? await musicService.pause()
+                    do {
+                        try await musicService.pause()
+                    } catch {
+                        // Pause errors are non-critical, just log
+                        print("Failed to pause before skipping: \(error)")
+                    }
 
                     // Try to skip to the previous song in the queue
                     try await musicService.skipToPreviousItem()
 
                     // Wait for the song to change and playback to initialize
-                    try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+                    try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
 
                     // Check if the new song has markers
                     if let currentTrack = musicService.currentTrack,
@@ -927,15 +990,26 @@ struct NowPlayingView: View {
                         // Navigate to the last marker of the new song
                         let startTime = max(0, lastMarker.timestamp - defaultCueTime)
                         await musicService.seek(to: startTime)
-                        try? await musicService.play()
+
+                        do {
+                            try await musicService.play()
+                        } catch {
+                            showError(.playbackFailed)
+                        }
                     } else {
                         // If no markers, play from the beginning
-                        try? await musicService.play()
+                        do {
+                            try await musicService.play()
+                        } catch {
+                            showError(.playbackFailed)
+                        }
                     }
+                } catch is CancellationError {
+                    // Task was cancelled, ignore
+                    return
                 } catch {
-                    // If skipping fails (no previous song), trigger error haptic
-                    let generator = UINotificationFeedbackGenerator()
-                    generator.notificationOccurred(.error)
+                    // If skipping fails (no previous song), show error
+                    showError(.skipPreviousFailed)
                 }
             }
         }
@@ -946,20 +1020,30 @@ struct NowPlayingView: View {
             Task {
                 let startTime = max(0, marker.timestamp - defaultCueTime)
                 await musicService.seek(to: startTime)
-                try? await musicService.play()
+
+                do {
+                    try await musicService.play()
+                } catch {
+                    showError(.playbackFailed)
+                }
             }
         } else {
             // No next marker found in current song - try to skip to next song
             Task {
                 do {
                     // Pause first to prevent any playback before we're ready
-                    try? await musicService.pause()
+                    do {
+                        try await musicService.pause()
+                    } catch {
+                        // Pause errors are non-critical, just log
+                        print("Failed to pause before skipping: \(error)")
+                    }
 
                     // Try to skip to the next song in the queue
                     try await musicService.skipToNextItem()
 
                     // Wait for the song to change and playback to initialize
-                    try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+                    try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
 
                     // Check if the new song has markers
                     if let currentTrack = musicService.currentTrack,
@@ -969,15 +1053,26 @@ struct NowPlayingView: View {
                         // Navigate to the first marker of the new song
                         let startTime = max(0, firstMarker.timestamp - defaultCueTime)
                         await musicService.seek(to: startTime)
-                        try? await musicService.play()
+
+                        do {
+                            try await musicService.play()
+                        } catch {
+                            showError(.playbackFailed)
+                        }
                     } else {
                         // If no markers, resume playback from the beginning
-                        try? await musicService.play()
+                        do {
+                            try await musicService.play()
+                        } catch {
+                            showError(.playbackFailed)
+                        }
                     }
+                } catch is CancellationError {
+                    // Task was cancelled, ignore
+                    return
                 } catch {
-                    // If skipping fails (no next song), trigger error haptic
-                    let generator = UINotificationFeedbackGenerator()
-                    generator.notificationOccurred(.error)
+                    // If skipping fails (no next song), show error
+                    showError(.skipNextFailed)
                 }
             }
         }
@@ -1030,7 +1125,14 @@ struct NowPlayingView: View {
 
         let newMarkedSong = MarkedSong(from: track)
         modelContext.insert(newMarkedSong)
-        try? modelContext.save()
+
+        do {
+            try modelContext.save()
+        } catch {
+            print("Failed to save new marked song: \(error)")
+            showError(.databaseSaveFailed)
+        }
+
         return newMarkedSong
     }
 
@@ -1049,7 +1151,12 @@ struct NowPlayingView: View {
             modelContext.delete(song)
         }
 
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            print("Failed to delete marker: \(error)")
+            showError(.databaseSaveFailed)
+        }
     }
 
     private func migrateLegacySongs() {
@@ -1069,7 +1176,12 @@ struct NowPlayingView: View {
             song.lastMarkedAt = now
         }
 
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            print("Failed to migrate legacy songs: \(error)")
+            // Don't show error for migration as it's a background operation
+        }
     }
 }
 
