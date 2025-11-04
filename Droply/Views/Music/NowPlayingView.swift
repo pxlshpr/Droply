@@ -120,7 +120,7 @@ struct NowPlayingView: View {
                     VStack(spacing: 0) {
                         // Album artwork - show placeholder if only pending marked song
                         if let track = track {
-                            albumArtwork(for: track)
+                            albumArtwork(for: track, cachedArtworkURL: markedSong?.artworkURL)
                                 .frame(width: artworkSize, height: artworkSize)
                                 .padding(.horizontal, 16)
                                 .padding(.bottom, 16)
@@ -764,62 +764,81 @@ struct NowPlayingView: View {
     // MARK: - Views
 
     @ViewBuilder
-    private func albumArtwork(for track: PlayableTrack) -> some View {
+    private func albumArtwork(for track: PlayableTrack, cachedArtworkURL: String? = nil) -> some View {
         GeometryReader { geo in
             Group {
-                switch track.artwork {
-                case .musicKit(let artwork):
-                    // For Apple Music tracks, use LazyImage with URL
-                    if let artworkURL = artwork?.url(width: Int(geo.size.width), height: Int(geo.size.height)) {
-                        LazyImage(url: artworkURL) { state in
-                            if let image = state.image {
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(width: geo.size.width, height: geo.size.width)
-                                    .clipped()
-                            } else {
-                                placeholderArtwork(size: geo.size.width)
-                            }
+                // Prefer cached 300x300 artwork URL if available - avoids flash when loading high-res
+                if let cachedURLString = cachedArtworkURL,
+                   let cachedURL = URL(string: cachedURLString) {
+                    LazyImage(url: cachedURL) { state in
+                        if let image = state.image {
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: geo.size.width, height: geo.size.width)
+                                .clipped()
+                        } else {
+                            placeholderArtwork(size: geo.size.width)
                         }
-                        .cornerRadius(12)
-                        .shadow(radius: 10)
-                    } else {
-                        placeholderArtwork(size: geo.size.width)
                     }
-
-                case .mediaPlayer(let artwork):
-                    // For local tracks, use the UIImage directly
-                    if let uiImage = artwork?.image(at: CGSize(width: geo.size.width, height: geo.size.width)) {
-                        Image(uiImage: uiImage)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: geo.size.width, height: geo.size.width)
-                            .clipped()
+                    .cornerRadius(12)
+                    .shadow(radius: 10)
+                } else {
+                    // Fall back to track's native artwork
+                    switch track.artwork {
+                    case .musicKit(let artwork):
+                        // For Apple Music tracks without cached URL, use LazyImage with URL
+                        if let artworkURL = artwork?.url(width: Int(geo.size.width), height: Int(geo.size.height)) {
+                            LazyImage(url: artworkURL) { state in
+                                if let image = state.image {
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(width: geo.size.width, height: geo.size.width)
+                                        .clipped()
+                                } else {
+                                    placeholderArtwork(size: geo.size.width)
+                                }
+                            }
                             .cornerRadius(12)
                             .shadow(radius: 10)
-                    } else {
-                        placeholderArtwork(size: geo.size.width)
-                    }
-
-                case .cachedURL(let urlString):
-                    // For cached tracks, use LazyImage with URL string
-                    if let urlString = urlString, let artworkURL = URL(string: urlString) {
-                        LazyImage(url: artworkURL) { state in
-                            if let image = state.image {
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(width: geo.size.width, height: geo.size.width)
-                                    .clipped()
-                            } else {
-                                placeholderArtwork(size: geo.size.width)
-                            }
+                        } else {
+                            placeholderArtwork(size: geo.size.width)
                         }
-                        .cornerRadius(12)
-                        .shadow(radius: 10)
-                    } else {
-                        placeholderArtwork(size: geo.size.width)
+
+                    case .mediaPlayer(let artwork):
+                        // For local tracks, use the UIImage directly
+                        if let uiImage = artwork?.image(at: CGSize(width: geo.size.width, height: geo.size.width)) {
+                            Image(uiImage: uiImage)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: geo.size.width, height: geo.size.width)
+                                .clipped()
+                                .cornerRadius(12)
+                                .shadow(radius: 10)
+                        } else {
+                            placeholderArtwork(size: geo.size.width)
+                        }
+
+                    case .cachedURL(let urlString):
+                        // For cached tracks, use LazyImage with URL string
+                        if let urlString = urlString, let artworkURL = URL(string: urlString) {
+                            LazyImage(url: artworkURL) { state in
+                                if let image = state.image {
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(width: geo.size.width, height: geo.size.width)
+                                        .clipped()
+                                } else {
+                                    placeholderArtwork(size: geo.size.width)
+                                }
+                            }
+                            .cornerRadius(12)
+                            .shadow(radius: 10)
+                        } else {
+                            placeholderArtwork(size: geo.size.width)
+                        }
                     }
                 }
             }
