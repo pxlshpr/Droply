@@ -246,7 +246,7 @@ class MusicKitService {
                                 // This is the track we're expecting! Clear the flag and update
                                 self.logger.info("✅ Expected track started playing: \(song.title) (id: \(track.id))")
                                 self.expectedTrackID = nil
-                                self.currentTrack = track
+                                self.setCurrentTrack(track)
                                 self.playbackDuration = song.duration ?? 0
                                 self.playbackTime = systemPlayer.currentPlaybackTime
                                 self.logger.info("Successfully set currentTrack to expected track")
@@ -257,7 +257,7 @@ class MusicKitService {
                             }
                         } else {
                             // No specific track expected, update normally
-                            self.currentTrack = track
+                            self.setCurrentTrack(track)
                             self.playbackDuration = song.duration ?? 0
                             self.playbackTime = systemPlayer.currentPlaybackTime
                             self.logger.info("Successfully converted to Apple Music track: \(song.title)")
@@ -288,7 +288,7 @@ class MusicKitService {
                     // This is the track we're expecting! Clear the flag and update
                     self.logger.info("✅ Expected local track started playing: \(track.title) (id: \(track.id))")
                     self.expectedTrackID = nil
-                    self.currentTrack = track
+                    self.setCurrentTrack(track)
                     self.playbackDuration = mediaItem.playbackDuration
                     self.playbackTime = systemPlayer.currentPlaybackTime
                     self.logger.info("Successfully set currentTrack to expected local track")
@@ -299,7 +299,7 @@ class MusicKitService {
                 }
             } else {
                 // No specific track expected, update normally
-                self.currentTrack = track
+                self.setCurrentTrack(track)
                 self.playbackDuration = mediaItem.playbackDuration
                 self.playbackTime = systemPlayer.currentPlaybackTime
                 self.logger.info("Using local track: \(track.title) by \(track.artistName) (persistent ID: \(mediaItem.persistentID))")
@@ -327,7 +327,7 @@ class MusicKitService {
                         // This is the track we're expecting! Clear the flag and update
                         logger.info("✅ Expected track started playing (app player): \(song.title) (id: \(track.id))")
                         expectedTrackID = nil
-                        currentTrack = track
+                        setCurrentTrack(track)
                         playbackDuration = song.duration ?? 0
                         logger.info("Successfully set currentTrack to expected track from app player")
                     } else {
@@ -337,7 +337,7 @@ class MusicKitService {
                     }
                 } else {
                     // No specific track expected, update normally
-                    currentTrack = track
+                    setCurrentTrack(track)
                     playbackDuration = song.duration ?? 0
                     logger.info("Current track updated from app player: \(song.title) by \(song.artistName) (ID: \(song.id.rawValue))")
                 }
