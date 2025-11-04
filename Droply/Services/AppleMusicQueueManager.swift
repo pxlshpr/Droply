@@ -9,7 +9,6 @@ import Foundation
 import MediaPlayer
 import OSLog
 
-@MainActor
 class AppleMusicQueueManager {
     static let shared = AppleMusicQueueManager()
 
@@ -21,7 +20,9 @@ class AppleMusicQueueManager {
     private let queueDebounceDelay: UInt64 = 1_500_000_000 // 1.5 seconds in nanoseconds
 
     private init() {
-        systemPlayer.beginGeneratingPlaybackNotifications()
+        Task { @MainActor in
+            systemPlayer.beginGeneratingPlaybackNotifications()
+        }
     }
 
     // MARK: - Public Methods
@@ -30,7 +31,9 @@ class AppleMusicQueueManager {
     func play(_ item: ItemToPlay) async throws {
         logger.info("Playing single item: \(item.title) by \(item.artist)")
         try await setQueue(with: item)
-        systemPlayer.play()
+        await MainActor.run {
+            systemPlayer.play()
+        }
     }
 
     /// Plays multiple items, starting with the first
@@ -51,9 +54,11 @@ class AppleMusicQueueManager {
         logger.info("Successfully set queue, now starting playback")
 
         // Start playing
-        systemPlayer.shuffleMode = .off
-        systemPlayer.repeatMode = .all
-        systemPlayer.play()
+        await MainActor.run {
+            systemPlayer.shuffleMode = .off
+            systemPlayer.repeatMode = .all
+            systemPlayer.play()
+        }
 
         logger.info("Called systemPlayer.play()")
 
@@ -81,7 +86,7 @@ class AppleMusicQueueManager {
         logger.info("Playing with debounce: \(items.count) items, starting with: \(items[0].title)")
 
         // Set queue with ONLY the first item
-        guard let firstValidIndex = await setQueueWithFirstValidItem(from: [items[0]]) else {
+        guard await setQueueWithFirstValidItem(from: [items[0]]) != nil else {
             logger.error("No valid items found to play")
             throw QueueError.invalidItem
         }
@@ -89,9 +94,11 @@ class AppleMusicQueueManager {
         logger.info("Successfully set queue with first item, now starting playback")
 
         // Start playing immediately
-        systemPlayer.shuffleMode = .off
-        systemPlayer.repeatMode = .all
-        systemPlayer.play()
+        await MainActor.run {
+            systemPlayer.shuffleMode = .off
+            systemPlayer.repeatMode = .all
+            systemPlayer.play()
+        }
 
         logger.info("Called systemPlayer.play() for first item")
 
@@ -103,7 +110,7 @@ class AppleMusicQueueManager {
 
         // Schedule task to append remaining items after delay
         let remaining = Array(items.dropFirst(1))
-        pendingQueueTask = Task { @MainActor in
+        pendingQueueTask = Task {
             do {
                 logger.info("Waiting \(Double(self.queueDebounceDelay) / 1_000_000_000)s before queueing remaining \(remaining.count) items")
                 try await Task.sleep(nanoseconds: self.queueDebounceDelay)
@@ -136,24 +143,49 @@ class AppleMusicQueueManager {
         if item.isAppleStoreItem, let storeID = item.validAppleStoreID {
             // Apple Music catalog item
             logger.info("Setting queue with store ID: \(storeID)")
-            systemPlayer.setQueue(with: [storeID])
+
+            // Set queue on main thread
+            await MainActor.run {
+                systemPlayer.setQueue(with: [storeID])
+            }
 
             do {
-                try await systemPlayer.prepareToPlay()
+                // prepareToPlay() is async and must be called on main thread - but we're already off main
+                // So we need to switch to main for the entire async operation
+                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                    Task { @MainActor in
+                        do {
+                            try await systemPlayer.prepareToPlay()
+                            continuation.resume()
+                        } catch {
+                            continuation.resume(throwing: error)
+                        }
+                    }
+                }
                 logger.info("Successfully prepared to play: \(item.title)")
             } catch {
                 logger.error("Failed to prepare playback for \(item.title): \(error.localizedDescription)")
                 throw error
             }
         } else if item.isAppleLibraryItem {
-            // Library item - need to look it up
+            // Library item - need to look it up (this happens off main thread)
             logger.debug("Looking up library item")
             if let mediaItem = await findLibraryItem(for: item) {
-                let descriptor = MPMusicPlayerMediaItemQueueDescriptor(
-                    itemCollection: .init(items: [mediaItem])
-                )
-                systemPlayer.setQueue(with: descriptor)
-                try await systemPlayer.prepareToPlay()
+                // Set queue and prepare on main thread
+                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                    Task { @MainActor in
+                        do {
+                            let descriptor = MPMusicPlayerMediaItemQueueDescriptor(
+                                itemCollection: .init(items: [mediaItem])
+                            )
+                            systemPlayer.setQueue(with: descriptor)
+                            try await systemPlayer.prepareToPlay()
+                            continuation.resume()
+                        } catch {
+                            continuation.resume(throwing: error)
+                        }
+                    }
+                }
             } else {
                 logger.error("Could not find library item for: \(item.title)")
                 throw QueueError.libraryItemNotFound
@@ -192,23 +224,27 @@ class AppleMusicQueueManager {
             }
         }
 
-        // Append store items as one batch
+        // Append store items as one batch (on main thread)
         if !storeItems.isEmpty {
             let storeIDs = storeItems.compactMap { $0.validAppleStoreID }
             if !storeIDs.isEmpty {
-                let descriptor = MPMusicPlayerStoreQueueDescriptor(storeIDs: storeIDs)
-                systemPlayer.append(descriptor)
+                await MainActor.run {
+                    let descriptor = MPMusicPlayerStoreQueueDescriptor(storeIDs: storeIDs)
+                    systemPlayer.append(descriptor)
+                }
                 logger.debug("Appended \(storeIDs.count) store items")
             }
         }
 
-        // Append library items individually
+        // Append library items individually (findLibraryItem runs off main thread)
         for item in libraryItems {
             if let mediaItem = await findLibraryItem(for: item) {
-                let descriptor = MPMusicPlayerMediaItemQueueDescriptor(
-                    itemCollection: .init(items: [mediaItem])
-                )
-                systemPlayer.append(descriptor)
+                await MainActor.run {
+                    let descriptor = MPMusicPlayerMediaItemQueueDescriptor(
+                        itemCollection: .init(items: [mediaItem])
+                    )
+                    systemPlayer.append(descriptor)
+                }
                 logger.debug("Appended library item: \(item.title)")
             }
         }

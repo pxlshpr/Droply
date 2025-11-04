@@ -884,7 +884,7 @@ class MusicKitService {
         loadingSongTitle = song.title
 
         // Create a new task for this play operation
-        let playTask = Task<Void, Error> { @MainActor in
+        let playTask = Task<Void, Error> {
             // Check for cancellation before proceeding
             try Task.checkCancellation()
 
@@ -899,11 +899,13 @@ class MusicKitService {
             // Check for cancellation before updating state
             try Task.checkCancellation()
 
-            // Update current track immediately for UI responsiveness
-            let track = PlayableTrack(song: song)
-            currentTrack = track
-            playbackDuration = song.duration ?? 0
-            isPlaying = true
+            // Update current track immediately for UI responsiveness (on main thread)
+            await MainActor.run {
+                let track = PlayableTrack(song: song)
+                currentTrack = track
+                playbackDuration = song.duration ?? 0
+                isPlaying = true
+            }
 
             logger.info("Queue manager started playing song")
         }
@@ -960,7 +962,7 @@ class MusicKitService {
         loadingSongTitle = firstSong.title
 
         // Create a new task for this play operation
-        let playTask = Task<Void, Error> { @MainActor in
+        let playTask = Task<Void, Error> {
             // Check for cancellation before proceeding
             try Task.checkCancellation()
 
@@ -975,11 +977,13 @@ class MusicKitService {
             // Check for cancellation before updating state
             try Task.checkCancellation()
 
-            // Update current track immediately for UI responsiveness (first song in list)
-            let track = PlayableTrack(song: firstSong)
-            currentTrack = track
-            playbackDuration = firstSong.duration ?? 0
-            isPlaying = true
+            // Update current track immediately for UI responsiveness (first song in list, on main thread)
+            await MainActor.run {
+                let track = PlayableTrack(song: firstSong)
+                currentTrack = track
+                playbackDuration = firstSong.duration ?? 0
+                isPlaying = true
+            }
 
             logger.info("Queue manager started playing songs")
         }
