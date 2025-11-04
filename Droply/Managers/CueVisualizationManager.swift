@@ -72,12 +72,26 @@ class CueVisualizationManager: ObservableObject {
     func setup(musicService: MusicKitService) {
         self.musicService = musicService
 
-        // Observe playback time changes
-        musicService.$playbackTime
-            .sink { [weak self] _ in
+        // Start observing playback time changes with @Observable
+        Task { @MainActor in
+            observePlaybackTime()
+        }
+    }
+
+    @MainActor
+    private func observePlaybackTime() {
+        guard let musicService = musicService else { return }
+
+        _ = withObservationTracking {
+            // Access the property to register observation
+            _ = musicService.playbackTime
+        } onChange: {
+            Task { @MainActor [weak self] in
                 self?.updateCueState()
+                // Recursively continue observing
+                self?.observePlaybackTime()
             }
-            .store(in: &cancellables)
+        }
     }
 
     func startCue(for marker: SongMarker, defaultCueTime: Double, currentTime: TimeInterval, loopEnabled: Bool = false, loopDuration: TimeInterval = 0) {

@@ -11,7 +11,7 @@ import SwiftData
 struct EditMarkerView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    @ObservedObject private var musicService = MusicKitService.shared
+    private let musicService = MusicKitService.shared
 
     let marker: SongMarker
 

@@ -16,7 +16,7 @@ struct RecentlyMarkedView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    @ObservedObject private var musicService = MusicKitService.shared
+    private let musicService = MusicKitService.shared
     @State private var currentPlayTask: Task<Void, Never>?
 
     @Query(
@@ -81,30 +81,34 @@ struct RecentlyMarkedView: View {
                             ForEach(groupedSongs, id: \.period) { group in
                                 Section(header: Text(group.period)) {
                                     ForEach(group.songs) { song in
-                                        RecentlyMarkedRow(song: song)
-                                            .contentShape(Rectangle())
-                                            .onTapGesture {
-                                                // Instant feedback: Set pending marked song for immediate UI update
-                                                musicService.setPendingMarkedSong(song)
+                                        Button {
+                                            // Haptic feedback FIRST for instant tactile response
+                                            let generator = UIImpactFeedbackGenerator(style: .heavy)
+                                            generator.impactOccurred()
 
-                                                // Play haptic feedback immediately
-                                                let generator = UIImpactFeedbackGenerator(style: .heavy)
-                                                generator.impactOccurred()
+                                            // Extract metadata from SwiftData synchronously (on main thread)
+                                            let metadata = TrackMetadataDTO(from: song)
 
-                                                // Load full track metadata immediately (independent of queueing)
-                                                // This ensures UI updates with real track data ASAP
-                                                Task {
-                                                    await musicService.loadTrackMetadata(from: song)
-                                                }
+                                            // Set cached metadata instantly (synchronous, no Task delay)
+                                            musicService.setTrackMetadataFromCache(metadata)
 
-                                                // Cancel any existing play task
-                                                currentPlayTask?.cancel()
-
-                                                // Create new play task
-                                                currentPlayTask = Task {
-                                                    await playSong(song)
-                                                }
+                                            // Fetch fresh metadata from API in background (non-blocking)
+                                            Task {
+                                                await musicService.fetchFreshTrackMetadata(metadata)
                                             }
+
+                                            // Cancel any existing play task
+                                            currentPlayTask?.cancel()
+
+                                            // Create new play task
+                                            currentPlayTask = Task {
+                                                await playSong(song)
+                                            }
+                                        } label: {
+                                            RecentlyMarkedRow(song: song)
+                                                .contentShape(Rectangle())
+                                        }
+                                        .buttonStyle(SongRowButtonStyle())
                                     }
                                 }
                             }
@@ -477,7 +481,7 @@ struct SongMarkerPreview: View {
         ZStack(alignment: .leading) {
             // Background capsule representing song length
             Capsule()
-                .fill(.quaternary)
+                .fill(Color(uiColor: .systemGray5))
                 .frame(width: timelineWidth, height: capsuleHeight)
                 .padding(.horizontal, 1)
                 .padding(.vertical, 1)

@@ -10,13 +10,22 @@ import SwiftData
 import MusicKit
 import MediaPlayer
 import NukeUI
+import OSLog
 
 struct FloatingNowPlayingBar: View {
-    @ObservedObject private var musicService = MusicKitService.shared
+    private let musicService = MusicKitService.shared
     @AppStorage("defaultCueTime") private var defaultCueTime: Double = 5.0
     @Query private var markedSongs: [MarkedSong]
 
+    private let logger = Logger(subsystem: "com.droply.app", category: "FloatingNowPlayingBar")
+
     let onTap: () -> Void
+
+    private func timestamp() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss.SSS"
+        return formatter.string(from: Date())
+    }
 
     private var currentMarkedSong: MarkedSong? {
         guard let track = musicService.currentTrack else { return nil }
@@ -95,6 +104,31 @@ struct FloatingNowPlayingBar: View {
                         font: .subheadline.weight(.semibold)
                     )
                     .frame(height: 18)
+                    .onAppear {
+                        let time = timestamp()
+                        if musicService.currentTrack != nil {
+                            logger.info("[\(time)] 📺 Displaying CURRENT track: \(track.title) by \(track.artistName)")
+                        } else {
+                            logger.info("[\(time)] 📺 Displaying PENDING track: \(track.title) by \(track.artistName)")
+                        }
+                    }
+                    .onChange(of: track.id) { oldValue, newValue in
+                        let time = timestamp()
+                        logger.info("[\(time)] 📺 ✨ UI CHANGE DETECTED - track.id changed from \(oldValue) to \(newValue)")
+                        if musicService.currentTrack != nil {
+                            logger.info("[\(time)] 📺 Now showing CURRENT track: \(track.title) by \(track.artistName)")
+                        } else {
+                            logger.info("[\(time)] 📺 Now showing PENDING track: \(track.title) by \(track.artistName)")
+                        }
+                    }
+                    .onChange(of: musicService.pendingTrack?.id) { oldValue, newValue in
+                        let time = timestamp()
+                        logger.info("[\(time)] 📺 🔔 pendingTrack.id changed from \(oldValue ?? "nil") to \(newValue ?? "nil")")
+                    }
+                    .onChange(of: musicService.currentTrack?.id) { oldValue, newValue in
+                        let time = timestamp()
+                        logger.info("[\(time)] 📺 🔔 currentTrack.id changed from \(oldValue ?? "nil") to \(newValue ?? "nil")")
+                    }
 
                     Text(track.artistName)
                         .font(.caption)
@@ -107,6 +141,10 @@ struct FloatingNowPlayingBar: View {
                     Text("Nothing Playing")
                         .font(.subheadline.weight(.semibold))
                         .frame(height: 18)
+                        .onAppear {
+                            let time = timestamp()
+                            logger.debug("[\(time)] 📺 Displaying 'Nothing Playing' - currentTrack: \(musicService.currentTrack == nil ? "nil" : "exists"), pendingTrack: \(musicService.pendingTrack == nil ? "nil" : "exists")")
+                        }
 
                     Text("Tap a song to get started")
                         .font(.caption)

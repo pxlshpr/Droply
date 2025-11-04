@@ -13,7 +13,7 @@ import NukeUI
 
 struct NowPlayingView: View {
     @Environment(\.modelContext) private var modelContext
-    @ObservedObject private var musicService = MusicKitService.shared
+    private let musicService = MusicKitService.shared
     @StateObject private var cueManager = CueVisualizationManager.shared
     @State private var markedSong: MarkedSong?
     @State private var showingAddMarker = false

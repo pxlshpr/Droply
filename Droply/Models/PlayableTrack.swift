@@ -10,6 +10,33 @@ import MediaPlayer
 import MusicKit
 import SwiftData
 
+/// Lightweight DTO for track metadata - extracted synchronously from SwiftData
+/// This avoids SwiftData threading issues when passing data to async contexts
+struct TrackMetadataDTO {
+    let appleMusicID: String
+    let persistentID: String
+    let title: String
+    let artist: String
+    let albumTitle: String?
+    let duration: TimeInterval
+    let artworkURL: String?
+    let isAppleMusic: Bool
+    let isLocal: Bool
+
+    init(from markedSong: MarkedSong) {
+        // Extract all data synchronously in one go
+        self.appleMusicID = markedSong.appleMusicID
+        self.persistentID = markedSong.persistentID
+        self.title = markedSong.title
+        self.artist = markedSong.artist
+        self.albumTitle = markedSong.albumTitle
+        self.duration = markedSong.duration
+        self.artworkURL = markedSong.artworkURL
+        self.isAppleMusic = markedSong.isAppleMusic
+        self.isLocal = markedSong.isLocal
+    }
+}
+
 /// Represents a track that can be played, supporting both Apple Music catalog tracks and local synced tracks
 public struct PlayableTrack: Identifiable, Hashable {
     public let id: String
@@ -162,6 +189,24 @@ extension PlayableTrack {
         self.albumTitle = markedSong.albumTitle
         self.duration = markedSong.duration
         self.artwork = .cachedURL(markedSong.artworkURL)
+    }
+
+    /// Create a PlayableTrack from cached metadata DTO (instant, no SwiftData access)
+    /// This enables immediate UI updates without SwiftData threading issues
+    init(cachedFrom metadata: TrackMetadataDTO) {
+        if metadata.isAppleMusic {
+            self.id = metadata.appleMusicID
+            self.source = .cached(type: .appleMusic, id: metadata.appleMusicID)
+        } else {
+            self.id = metadata.persistentID
+            self.source = .cached(type: .local, id: metadata.persistentID)
+        }
+
+        self.title = metadata.title
+        self.artistName = metadata.artist
+        self.albumTitle = metadata.albumTitle
+        self.duration = metadata.duration
+        self.artwork = .cachedURL(metadata.artworkURL)
     }
 }
 

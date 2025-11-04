@@ -11,7 +11,7 @@ import SwiftData
 struct AddMarkerView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    @ObservedObject private var musicService = MusicKitService.shared
+    private let musicService = MusicKitService.shared
     @AppStorage("defaultCueTime") private var defaultCueTime: Double = 5.0
 
     let currentTime: TimeInterval

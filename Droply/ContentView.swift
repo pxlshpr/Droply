@@ -9,15 +9,34 @@ import SwiftUI
 import SwiftData
 import MusicKit
 import MediaPlayer
+import OSLog
+
+// Button style that highlights on press
+struct SongRowButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .opacity(configuration.isPressed ? 0.6 : 1.0)
+            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
+            .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
+    }
+}
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
-    @ObservedObject private var musicService = MusicKitService.shared
+    private let musicService = MusicKitService.shared
     @State private var showingAuthorization = false
     @State private var showingNowPlaying = false
     @State private var currentPlayTask: Task<Void, Never>?
     @State private var showingError = false
     @State private var errorMessage = ""
+
+    private let logger = Logger(subsystem: "com.droply.app", category: "ContentView")
+
+    private func timestamp() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss.SSS"
+        return formatter.string(from: Date())
+    }
 
     @Query(
         filter: #Predicate<MarkedSong> { song in
@@ -68,30 +87,53 @@ struct ContentView: View {
                             ForEach(groupedSongs, id: \.period) { group in
                                 Section(header: Text(group.period)) {
                                     ForEach(group.songs) { song in
-                                        RecentlyMarkedRow(song: song)
-                                            .contentShape(Rectangle())
-                                            .onTapGesture {
-                                                // Instant feedback: Set pending marked song for immediate UI update
-                                                musicService.setPendingMarkedSong(song)
+                                        Button {
+                                            let tapTime = timestamp()
+                                            logger.info("[\(tapTime)] 🎯 Song tapped: \(song.title) by \(song.artist)")
 
-                                                // Haptic feedback for instant responsiveness
-                                                let generator = UIImpactFeedbackGenerator(style: .light)
-                                                generator.impactOccurred()
+                                            // Haptic feedback FIRST for instant tactile response
+                                            let hapticTime = timestamp()
+                                            logger.debug("[\(hapticTime)] 📳 Triggering haptic feedback...")
+                                            let generator = UIImpactFeedbackGenerator(style: .light)
+                                            generator.impactOccurred()
 
-                                                // Load full track metadata immediately (independent of queueing)
-                                                // This ensures UI updates with real track data ASAP
-                                                Task {
-                                                    await musicService.loadTrackMetadata(from: song)
-                                                }
+                                            // Extract metadata from SwiftData synchronously (on main thread)
+                                            let extractTime = timestamp()
+                                            logger.debug("[\(extractTime)] 📦 Extracting metadata from SwiftData...")
+                                            let metadata = TrackMetadataDTO(from: song)
+                                            let extractedTime = timestamp()
+                                            logger.debug("[\(extractedTime)] 📦 Metadata extracted")
 
-                                                // Cancel any existing play task
-                                                currentPlayTask?.cancel()
+                                            // Set cached metadata instantly (synchronous, no Task delay)
+                                            let setCacheTime = timestamp()
+                                            logger.debug("[\(setCacheTime)] 💾 Setting cached metadata...")
+                                            musicService.setTrackMetadataFromCache(metadata)
+                                            let cacheSetTime = timestamp()
+                                            logger.info("[\(cacheSetTime)] ✅ Cached metadata set instantly!")
 
-                                                // Create new play task
-                                                currentPlayTask = Task {
-                                                    await playSong(song)
-                                                }
+                                            // Fetch fresh metadata from API in background (non-blocking)
+                                            let preTaskTime = timestamp()
+                                            logger.debug("[\(preTaskTime)] 🔄 Creating Task to fetch fresh metadata...")
+                                            Task {
+                                                let taskStartTime = timestamp()
+                                                logger.info("[\(taskStartTime)] 🚀 Task started for fresh metadata fetch")
+                                                await musicService.fetchFreshTrackMetadata(metadata)
+                                                let taskEndTime = timestamp()
+                                                logger.info("[\(taskEndTime)] ✅ Fresh metadata fetch completed")
                                             }
+
+                                            // Cancel any existing play task
+                                            currentPlayTask?.cancel()
+
+                                            // Create new play task
+                                            currentPlayTask = Task {
+                                                await playSong(song)
+                                            }
+                                        } label: {
+                                            RecentlyMarkedRow(song: song)
+                                                .contentShape(Rectangle())
+                                        }
+                                        .buttonStyle(SongRowButtonStyle())
                                     }
                                 }
                             }
