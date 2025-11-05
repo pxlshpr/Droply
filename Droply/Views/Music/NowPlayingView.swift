@@ -365,17 +365,7 @@ struct NowPlayingView: View {
                             showBufferTimePopover: $showingBufferTimePopover,
                             markerForPopover: $markerForBufferTimeSelection,
                             bufferTimePopoverContent: { marker in
-                                AnyView(
-                                    BufferTimeSelectionPopover(
-                                        onSelect: { bufferTime in
-                                            playMarkerWithBufferTime(marker, bufferTime: bufferTime)
-                                        },
-                                        onEditDrop: {
-                                            markerToEdit = marker
-                                            showingEditMarker = true
-                                        }
-                                    )
-                                )
+                                AnyView(bufferTimePopover(for: marker))
                             }
                         )
                         .frame(maxWidth: availableWidth)
@@ -553,17 +543,7 @@ struct NowPlayingView: View {
                                 showBufferTimePopover: $showingBufferTimePopover,
                                 markerForPopover: $markerForBufferTimeSelection,
                                 bufferTimePopoverContent: { marker in
-                                    AnyView(
-                                        BufferTimeSelectionPopover(
-                                            onSelect: { bufferTime in
-                                                playMarkerWithBufferTime(marker, bufferTime: bufferTime)
-                                            },
-                                            onEditDrop: {
-                                                markerToEdit = marker
-                                                showingEditMarker = true
-                                            }
-                                        )
-                                    )
+                                    AnyView(bufferTimePopover(for: marker))
                                 }
                             )
                             .frame(maxWidth: availableWidth)
@@ -1025,6 +1005,20 @@ struct NowPlayingView: View {
             let minutes = Int(seconds / 60)
             return "\(minutes)m"
         }
+    }
+
+    private func bufferTimePopover(for marker: SongMarker) -> some View {
+        BufferTimeSelectionPopover(
+            onSelect: { bufferTime in
+                playMarkerWithBufferTime(marker, bufferTime: bufferTime)
+            },
+            onEditDrop: {
+                markerToEdit = marker
+                showingEditMarker = true
+            },
+            backgroundColor1: musicService.backgroundColor1,
+            backgroundColor2: musicService.backgroundColor2
+        )
     }
 
     private func updateMarkedSong(for track: PlayableTrack?) {

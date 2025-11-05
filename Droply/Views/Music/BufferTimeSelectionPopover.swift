@@ -10,6 +10,8 @@ import SwiftUI
 struct BufferTimeSelectionPopover: View {
     let onSelect: (TimeInterval) -> Void
     let onEditDrop: () -> Void
+    let backgroundColor1: Color
+    let backgroundColor2: Color
     @Environment(\.dismiss) private var dismiss
 
     // Buffer time options in seconds
@@ -33,14 +35,12 @@ struct BufferTimeSelectionPopover: View {
                     Button {
                         handleSelection(time)
                     } label: {
-                        Text(formatCueTime(time))
-                            .font(.callout)
-                            .fontWeight(.medium)
+                        formatCueTimeLabel(time)
                             .frame(maxWidth: .infinity)
                             .frame(height: 70)
                     }
                     .buttonStyle(.borderedProminent)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .buttonBorderShape(.roundedRectangle(radius: 16))
                 }
             }
 
@@ -53,15 +53,23 @@ struct BufferTimeSelectionPopover: View {
                 onEditDrop()
             } label: {
                 Label("Edit Drop", systemImage: "pencil")
-                    .font(.callout)
+                    .font(.body)
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
             .controlSize(.regular)
+            .buttonBorderShape(.roundedRectangle(radius: 16))
         }
         .padding(20)
         .frame(width: 320)
         .presentationCompactAdaptation(.popover)
+        .background(
+            LinearGradient(
+                colors: [backgroundColor1, backgroundColor2],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
     }
 
     private func handleSelection(_ time: TimeInterval) {
@@ -74,18 +82,33 @@ struct BufferTimeSelectionPopover: View {
         onSelect(time)
     }
 
-    private func formatCueTime(_ seconds: TimeInterval) -> String {
+    @ViewBuilder
+    private func formatCueTimeLabel(_ seconds: TimeInterval) -> some View {
         if seconds == 0 {
-            return "0s"
+            Text("0s")
+                .font(.title2)
+                .fontWeight(.semibold)
         } else if seconds < 60 {
-            return "\(Int(seconds))s"
+            Text("\(Int(seconds))s")
+                .font(.title2)
+                .fontWeight(.semibold)
         } else {
             let minutes = Int(seconds / 60)
             let remainingSeconds = Int(seconds.truncatingRemainder(dividingBy: 60))
             if remainingSeconds == 0 {
-                return "\(minutes)m"
+                Text("\(minutes)m")
+                    .font(.title2)
+                    .fontWeight(.semibold)
             } else {
-                return "\(minutes)m \(remainingSeconds)s"
+                VStack(spacing: 0) {
+                    Text("\(minutes)m")
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                    Text("\(remainingSeconds)s")
+                        .font(.callout)
+                        .fontWeight(.medium)
+                        .opacity(0.75)
+                }
             }
         }
     }
@@ -98,6 +121,8 @@ struct BufferTimeSelectionPopover: View {
         },
         onEditDrop: {
             print("Edit drop tapped")
-        }
+        },
+        backgroundColor1: .blue,
+        backgroundColor2: .purple
     )
 }
