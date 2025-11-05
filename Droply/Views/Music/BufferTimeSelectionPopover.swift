@@ -27,7 +27,7 @@ struct BufferTimeSelectionPopover: View {
             // Header
             Text("Buffer Time")
                 .font(.headline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.white.opacity(0.7))
 
             // Grid of buffer time options
             LazyVGrid(columns: columns, spacing: 12) {
@@ -36,11 +36,11 @@ struct BufferTimeSelectionPopover: View {
                         handleSelection(time)
                     } label: {
                         formatCueTimeLabel(time)
+                            .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
                             .frame(height: 70)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .buttonBorderShape(.roundedRectangle(radius: 16))
+                    .buttonStyle(.glassProminent)
                 }
             }
 
@@ -54,22 +54,23 @@ struct BufferTimeSelectionPopover: View {
             } label: {
                 Label("Edit Drop", systemImage: "pencil")
                     .font(.body)
+                    .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
+                    .frame(height: 44)
             }
-            .buttonStyle(.bordered)
-            .controlSize(.regular)
-            .buttonBorderShape(.roundedRectangle(radius: 16))
+            .buttonStyle(.glass)
         }
         .padding(20)
         .frame(width: 320)
         .presentationCompactAdaptation(.popover)
-        .background(
-            LinearGradient(
-                colors: [backgroundColor1, backgroundColor2],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
+        
+//        .presentationBackground(
+//            LinearGradient(
+//                colors: [backgroundColor1, backgroundColor2],
+//                startPoint: .topLeading,
+//                endPoint: .bottomTrailing
+//            )
+//        )
     }
 
     private func handleSelection(_ time: TimeInterval) {
@@ -100,15 +101,17 @@ struct BufferTimeSelectionPopover: View {
                     .font(.title2)
                     .fontWeight(.semibold)
             } else {
-                VStack(spacing: 0) {
+                VStack(spacing: 1) {
                     Text("\(minutes)m")
                         .font(.title2)
                         .fontWeight(.semibold)
+                        .frame(maxWidth: .infinity)
                     Text("\(remainingSeconds)s")
                         .font(.callout)
                         .fontWeight(.medium)
                         .opacity(0.75)
                 }
+                .frame(maxWidth: .infinity)
             }
         }
     }
