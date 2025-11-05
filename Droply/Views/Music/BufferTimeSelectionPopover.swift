@@ -64,8 +64,6 @@ struct BufferTimeSelectionPopover: View {
         .padding(20)
         .frame(width: 320)
         .presentationCompactAdaptation(.popover)
-        .presentationBackground(.ultraThickMaterial)
-        .environment(\.colorScheme, .dark)
     }
 
     private func handleSelection(_ time: TimeInterval) {
