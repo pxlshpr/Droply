@@ -12,6 +12,7 @@ enum CueVisualizationMode: String, CaseIterable, Identifiable {
     case button = "Button"
     case marker = "Marker"
     case fullscreen = "Fullscreen"
+    case fullscreenCompact = "Fullscreen Compact"
 
     var id: String { rawValue }
 
@@ -20,6 +21,7 @@ enum CueVisualizationMode: String, CaseIterable, Identifiable {
         case .button: return "rectangle.fill"
         case .marker: return "location.fill"
         case .fullscreen: return "arrow.up.left.and.arrow.down.right"
+        case .fullscreenCompact: return "arrow.up.backward.and.arrow.down.forward"
         }
     }
 
@@ -28,6 +30,7 @@ enum CueVisualizationMode: String, CaseIterable, Identifiable {
         case .button: return "Fill the cue time button at the bottom"
         case .marker: return "Fill the marker button on timeline"
         case .fullscreen: return "Full-screen immersive visualization"
+        case .fullscreenCompact: return "Full-screen with existing UI elements"
         }
     }
 }

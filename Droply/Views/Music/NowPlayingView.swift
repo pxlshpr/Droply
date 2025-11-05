@@ -31,7 +31,7 @@ struct NowPlayingView: View {
     @AppStorage("loopDuration") private var loopDuration: Double = 10.0
     @Namespace private var recentlyMarkedNamespace
     @Namespace private var editMarkerNamespace
-    @AppStorage("cueVisualizationMode") private var visualizationMode: String = CueVisualizationMode.button.rawValue
+    @AppStorage("cueVisualizationMode") private var visualizationMode: String = CueVisualizationMode.fullscreenCompact.rawValue
 
     // Error handling
     @State private var showingErrorAlert = false
@@ -198,10 +198,11 @@ struct NowPlayingView: View {
                                             loopDuration: loopDuration
                                         )
 
-                                        // Show fullscreen if that mode is selected
+                                        // Show fullscreen if that mode is selected (not fullscreenCompact)
                                         if currentVisualizationMode == .fullscreen {
                                             cueManager.showFullscreenVisualization = true
                                         }
+                                        // fullscreenCompact mode will be handled by the overlay in the ZStack
                                     } catch {
                                         showError(.playbackFailed)
                                     }
@@ -562,6 +563,19 @@ struct NowPlayingView: View {
                     )
                     .padding(.horizontal)
                 }
+                }
+
+                // Fullscreen Compact Visualization Overlay
+                if currentVisualizationMode == .fullscreenCompact,
+                   let cue = cueManager.currentCue,
+                   cueManager.cueProgress > 0 {
+                    FullscreenCompactCueVisualization(
+                        marker: cue.marker,
+                        progress: cueManager.cueProgress,
+                        remainingTime: cue.endTime - musicService.playbackTime,
+                        meshColors: musicService.meshColors
+                    )
+                    .transition(.opacity)
                 }
             }
             }
@@ -1140,10 +1154,11 @@ struct NowPlayingView: View {
                     loopDuration: loopDuration
                 )
 
-                // Show fullscreen if that mode is selected
+                // Show fullscreen if that mode is selected (not fullscreenCompact)
                 if currentVisualizationMode == .fullscreen {
                     cueManager.showFullscreenVisualization = true
                 }
+                // fullscreenCompact mode will be handled by the overlay in the ZStack
             } catch {
                 showError(.playbackFailed)
             }

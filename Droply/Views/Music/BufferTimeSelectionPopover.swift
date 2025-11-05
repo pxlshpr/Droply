@@ -14,8 +14,8 @@ struct BufferTimeSelectionPopover: View {
     let backgroundColor2: Color
     @Environment(\.dismiss) private var dismiss
 
-    // Buffer time options in seconds
-    private let bufferTimeOptions: [Double] = [0, 5, 10, 15, 30, 45, 60, 90, 120]
+    // Buffer time options in seconds (arranged to flow: 60, 90, 120 / 15, 30, 45 / 0, 5, 10)
+    private let bufferTimeOptions: [Double] = [60, 90, 120, 15, 30, 45, 0, 5, 10]
 
     // Grid layout configuration
     private let columns = [
@@ -24,10 +24,20 @@ struct BufferTimeSelectionPopover: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            // Header
-            Text("Buffer Time")
-                .font(.headline)
-                .foregroundStyle(.white.opacity(0.7))
+            // Edit Drop button (moved to top)
+            Button {
+                dismiss()
+                onEditDrop()
+            } label: {
+                Label("Edit Drop", systemImage: "pencil")
+                    .font(.body)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+            }
+            .buttonStyle(.glass)
+
+            Divider()
+                .padding(.vertical, 4)
 
             // Grid of buffer time options
             LazyVGrid(columns: columns, spacing: 12) {
@@ -45,21 +55,6 @@ struct BufferTimeSelectionPopover: View {
 //                    .buttonStyle(.glassProminent)
                 }
             }
-
-            Divider()
-                .padding(.vertical, 4)
-
-            // Edit Drop button (secondary action)
-            Button {
-                dismiss()
-                onEditDrop()
-            } label: {
-                Label("Edit Drop", systemImage: "pencil")
-                    .font(.body)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 44)
-            }
-            .buttonStyle(.glass)
         }
         .padding(20)
         .frame(width: 320)
