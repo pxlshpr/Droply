@@ -21,6 +21,8 @@ struct NowPlayingView: View {
     @State private var showingRecentlyMarked = false
     @State private var showingSettings = false
     @State private var showingCueTimeSelector = false
+    @State private var showingBufferTimePopover = false
+    @State private var markerForBufferTimeSelection: SongMarker?
     @State private var settingsDetent: PresentationDetent = .medium
     @State private var markerToEdit: SongMarker?
     @State private var selectedMarker: SongMarker?
@@ -180,7 +182,7 @@ struct NowPlayingView: View {
                             onMarkerTap: { marker in
                                 selectedMarker = marker
                                 Task {
-                                    let startTime = max(0, marker.timestamp - defaultCueTime)
+                                    let startTime = max(0, marker.timestamp - marker.cueTime)
                                     await musicService.seek(to: startTime)
 
                                     do {
@@ -189,7 +191,7 @@ struct NowPlayingView: View {
                                         // Start cue visualization
                                         cueManager.startCue(
                                             for: marker,
-                                            defaultCueTime: defaultCueTime,
+                                            defaultCueTime: marker.cueTime,
                                             currentTime: startTime,
                                             loopEnabled: loopModeEnabled,
                                             loopDuration: loopDuration
@@ -342,99 +344,42 @@ struct NowPlayingView: View {
 
                         Spacer()
 
-                        // Markers strip
-                        if currentVisualizationMode == .marker {
-                            HorizontalMarkerStripWithAutoScroll(
-                                markers: markedSong?.sortedMarkers ?? [],
-                                activeMarker: cueManager.currentCue?.marker,
-                                progress: cueManager.cueProgress,
-                                onTap: { marker in
-                                    Task {
-                                        let startTime = max(0, marker.timestamp - defaultCueTime)
-                                        await musicService.seek(to: startTime)
-
-                                        do {
-                                            try await musicService.play()
-
-                                            // Start cue visualization
-                                            cueManager.startCue(
-                                                for: marker,
-                                                defaultCueTime: defaultCueTime,
-                                                currentTime: startTime,
-                                                loopEnabled: loopModeEnabled,
-                                                loopDuration: loopDuration
-                                            )
-                                        } catch {
-                                            showError(.playbackFailed)
+                        // Markers strip - always shown
+                        HorizontalMarkerStripWithAutoScroll(
+                            markers: markedSong?.sortedMarkers ?? [],
+                            activeMarker: cueManager.currentCue?.marker,
+                            progress: cueManager.cueProgress,
+                            onTap: { marker in
+                                // Show buffer time popover instead of immediately playing
+                                markerForBufferTimeSelection = marker
+                                showingBufferTimePopover = true
+                            },
+                            onMarkerEdit: { marker in
+                                markerToEdit = marker
+                                showingEditMarker = true
+                            },
+                            onMarkerDelete: { marker in
+                                deleteMarker(marker)
+                            },
+                            meshColors: musicService.meshColors,
+                            showBufferTimePopover: $showingBufferTimePopover,
+                            markerForPopover: $markerForBufferTimeSelection,
+                            bufferTimePopoverContent: { marker in
+                                AnyView(
+                                    BufferTimeSelectionPopover(
+                                        onSelect: { bufferTime in
+                                            playMarkerWithBufferTime(marker, bufferTime: bufferTime)
+                                        },
+                                        onEditDrop: {
+                                            markerToEdit = marker
+                                            showingEditMarker = true
                                         }
-                                    }
-                                },
-                                onMarkerEdit: { marker in
-                                    markerToEdit = marker
-                                    showingEditMarker = true
-                                },
-                                onMarkerDelete: { marker in
-                                    deleteMarker(marker)
-                                },
-                                meshColors: musicService.meshColors
-                            )
-                            .frame(maxWidth: availableWidth)
-                        } else {
-                            HorizontalMarkerStrip(
-                                markers: markedSong?.sortedMarkers ?? [],
-                                onTap: { marker in
-                                    Task {
-                                        let startTime = max(0, marker.timestamp - defaultCueTime)
-                                        await musicService.seek(to: startTime)
-
-                                        do {
-                                            try await musicService.play()
-
-                                            // Start cue visualization
-                                            cueManager.startCue(
-                                                for: marker,
-                                                defaultCueTime: defaultCueTime,
-                                                currentTime: startTime,
-                                                loopEnabled: loopModeEnabled,
-                                                loopDuration: loopDuration
-                                            )
-
-                                            // Show fullscreen if that mode is selected
-                                            if currentVisualizationMode == .fullscreen {
-                                                cueManager.showFullscreenVisualization = true
-                                            }
-                                        } catch {
-                                            showError(.playbackFailed)
-                                        }
-                                    }
-                                },
-                                onMarkerEdit: { marker in
-                                    markerToEdit = marker
-                                    showingEditMarker = true
-                                },
-                                onMarkerDelete: { marker in
-                                    deleteMarker(marker)
-                                }
-                            )
-                            .frame(maxWidth: availableWidth)
-                        }
-
-                        // Cue Button Visualization (when in button mode)
-                        if currentVisualizationMode == .button {
-                            CueButtonVisualization(
-                                progress: cueManager.cueProgress,
-                                cueTime: defaultCueTime,
-                                isActive: cueManager.currentCue != nil,
-                                onTap: {
-                                    showingCueTimeSelector = true
-                                },
-                                meshColors: musicService.meshColors,
-                                loopEnabled: loopModeEnabled,
-                                loopDuration: loopDuration
-                            )
-                            .padding(.horizontal, 17)
-                            .padding(.top, 8)
-                        }
+                                    )
+                                )
+                            }
+                        )
+                        .frame(maxWidth: availableWidth)
+                        .padding(.top, 8)
                     }
                     .frame(maxWidth: availableWidth, alignment: .center)
                     .padding(.bottom, bottomSafeArea + 8)
@@ -588,53 +533,40 @@ struct NowPlayingView: View {
 
                         Spacer()
 
-                        // Markers strip
+                        // Markers strip - always shown (preview mode)
                         if let previewMarkedSong = markedSongs.first {
-                            if currentVisualizationMode == .marker {
-                                HorizontalMarkerStripWithAutoScroll(
-                                    markers: previewMarkedSong.sortedMarkers,
-                                    activeMarker: nil,
-                                    progress: 0,
-                                    onTap: { _ in },
-                                    onMarkerEdit: { marker in
-                                        markerToEdit = marker
-                                        showingEditMarker = true
-                                    },
-                                    onMarkerDelete: { marker in
-                                        deleteMarker(marker)
-                                    }
-                                )
-                                .frame(maxWidth: availableWidth)
-                            } else {
-                                HorizontalMarkerStrip(
-                                    markers: previewMarkedSong.sortedMarkers,
-                                    onTap: { _ in },
-                                    onMarkerEdit: { marker in
-                                        markerToEdit = marker
-                                        showingEditMarker = true
-                                    },
-                                    onMarkerDelete: { marker in
-                                        deleteMarker(marker)
-                                    }
-                                )
-                                .frame(maxWidth: availableWidth)
-                            }
-                        }
-
-                        // Cue Button Visualization (when in button mode)
-                        if currentVisualizationMode == .button {
-                            CueButtonVisualization(
-                                progress: cueManager.cueProgress,
-                                cueTime: defaultCueTime,
-                                isActive: cueManager.currentCue != nil,
-                                onTap: {
-                                    showingCueTimeSelector = true
+                            HorizontalMarkerStripWithAutoScroll(
+                                markers: previewMarkedSong.sortedMarkers,
+                                activeMarker: nil,
+                                progress: 0,
+                                onTap: { marker in
+                                    markerForBufferTimeSelection = marker
+                                    showingBufferTimePopover = true
                                 },
-                                meshColors: musicService.meshColors,
-                                loopEnabled: loopModeEnabled,
-                                loopDuration: loopDuration
+                                onMarkerEdit: { marker in
+                                    markerToEdit = marker
+                                    showingEditMarker = true
+                                },
+                                onMarkerDelete: { marker in
+                                    deleteMarker(marker)
+                                },
+                                showBufferTimePopover: $showingBufferTimePopover,
+                                markerForPopover: $markerForBufferTimeSelection,
+                                bufferTimePopoverContent: { marker in
+                                    AnyView(
+                                        BufferTimeSelectionPopover(
+                                            onSelect: { bufferTime in
+                                                playMarkerWithBufferTime(marker, bufferTime: bufferTime)
+                                            },
+                                            onEditDrop: {
+                                                markerToEdit = marker
+                                                showingEditMarker = true
+                                            }
+                                        )
+                                    )
+                                }
                             )
-                            .padding(.horizontal, 16)
+                            .frame(maxWidth: availableWidth)
                             .padding(.top, 8)
                         }
                     }
@@ -941,7 +873,7 @@ struct NowPlayingView: View {
         let currentTime = musicService.playbackTime
 
         // Find the last marker whose cue start time is before the current time
-        return markers.last { ($0.timestamp - defaultCueTime) < currentTime }
+        return markers.last { ($0.timestamp - $0.cueTime) < currentTime }
     }
 
     private func findNextMarker() -> SongMarker? {
@@ -949,13 +881,13 @@ struct NowPlayingView: View {
         let currentTime = musicService.playbackTime
 
         // Find the first marker whose cue start time is after the current time
-        return markers.first { ($0.timestamp - defaultCueTime) > currentTime }
+        return markers.first { ($0.timestamp - $0.cueTime) > currentTime }
     }
 
     private func navigateToPreviousMarker() {
         if let marker = findPreviousMarker() {
             Task {
-                let startTime = max(0, marker.timestamp - defaultCueTime)
+                let startTime = max(0, marker.timestamp - marker.cueTime)
                 await musicService.seek(to: startTime)
 
                 do {
@@ -988,7 +920,7 @@ struct NowPlayingView: View {
                        let newMarkedSong = markedSongs.first(where: { $0.appleMusicID == id || $0.persistentID == id }),
                        let lastMarker = newMarkedSong.sortedMarkers.last {
                         // Navigate to the last marker of the new song
-                        let startTime = max(0, lastMarker.timestamp - defaultCueTime)
+                        let startTime = max(0, lastMarker.timestamp - lastMarker.cueTime)
                         await musicService.seek(to: startTime)
 
                         do {
@@ -1018,7 +950,7 @@ struct NowPlayingView: View {
     private func navigateToNextMarker() {
         if let marker = findNextMarker() {
             Task {
-                let startTime = max(0, marker.timestamp - defaultCueTime)
+                let startTime = max(0, marker.timestamp - marker.cueTime)
                 await musicService.seek(to: startTime)
 
                 do {
@@ -1051,7 +983,7 @@ struct NowPlayingView: View {
                        let newMarkedSong = markedSongs.first(where: { $0.appleMusicID == id || $0.persistentID == id }),
                        let firstMarker = newMarkedSong.sortedMarkers.first {
                         // Navigate to the first marker of the new song
-                        let startTime = max(0, firstMarker.timestamp - defaultCueTime)
+                        let startTime = max(0, firstMarker.timestamp - firstMarker.cueTime)
                         await musicService.seek(to: startTime)
 
                         do {
@@ -1156,6 +1088,69 @@ struct NowPlayingView: View {
         } catch {
             print("Failed to delete marker: \(error)")
             showError(.databaseSaveFailed)
+        }
+    }
+
+    private func createQuickDrop(with bufferTime: TimeInterval) {
+        guard let track = musicService.currentTrack else { return }
+
+        let currentTime = musicService.playbackTime
+        let markedSong = getOrCreateMarkedSong(from: track)
+
+        // Create a "Drop" marker with the selected buffer time
+        let marker = SongMarker(
+            timestamp: currentTime,
+            emoji: "🔥",
+            name: "Drop",
+            cueTime: bufferTime
+        )
+
+        marker.song = markedSong
+        markedSong.lastMarkedAt = Date()
+        modelContext.insert(marker)
+
+        do {
+            try modelContext.save()
+            updateMarkedSong(for: track)
+
+            // Provide haptic feedback
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
+        } catch {
+            print("Failed to save quick drop: \(error)")
+            showError(.databaseSaveFailed)
+        }
+    }
+
+    private func playMarkerWithBufferTime(_ marker: SongMarker, bufferTime: TimeInterval) {
+        Task {
+            // Update marker's buffer time
+            marker.cueTime = bufferTime
+            try? modelContext.save()
+
+            // Play from the marker with the selected buffer time
+            let startTime = max(0, marker.timestamp - bufferTime)
+            await musicService.seek(to: startTime)
+
+            do {
+                try await musicService.play()
+
+                // Start cue visualization
+                cueManager.startCue(
+                    for: marker,
+                    defaultCueTime: bufferTime,
+                    currentTime: startTime,
+                    loopEnabled: loopModeEnabled,
+                    loopDuration: loopDuration
+                )
+
+                // Show fullscreen if that mode is selected
+                if currentVisualizationMode == .fullscreen {
+                    cueManager.showFullscreenVisualization = true
+                }
+            } catch {
+                showError(.playbackFailed)
+            }
         }
     }
 

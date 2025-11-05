@@ -15,6 +15,8 @@ struct CueMarkerVisualization: View {
     let onEdit: (() -> Void)?
     let onDelete: (() -> Void)?
     var meshColors: [Color]? // Optional mesh gradient colors from artwork
+    var showBufferTimePopover: Binding<Bool>? // Binding to control popover visibility
+    var bufferTimePopoverContent: (() -> AnyView)? // Content for the popover
 
     @State private var shimmerOffset: CGFloat = -1
 
@@ -98,6 +100,11 @@ struct CueMarkerVisualization: View {
             )
         }
         .buttonStyle(.plain)
+        .popover(isPresented: showBufferTimePopover ?? .constant(false)) {
+            if let content = bufferTimePopoverContent {
+                content()
+            }
+        }
         .contextMenu {
             if let onEdit = onEdit {
                 Button {
@@ -133,6 +140,9 @@ struct HorizontalMarkerStripWithAutoScroll: View {
     let onMarkerEdit: ((SongMarker) -> Void)?
     let onMarkerDelete: ((SongMarker) -> Void)?
     var meshColors: [Color]? // Optional mesh gradient colors from artwork
+    var showBufferTimePopover: Binding<Bool>? // Binding to control popover visibility
+    var markerForPopover: Binding<SongMarker?>? // Which marker the popover is for
+    var bufferTimePopoverContent: ((SongMarker) -> AnyView)? // Content for the popover
 
     @State private var hasScrolledToActive = false
 
@@ -150,6 +160,15 @@ struct HorizontalMarkerStripWithAutoScroll: View {
                         // Existing markers
                         ForEach(markers) { marker in
                             let isActive = activeMarker?.id == marker.id
+                            let shouldShowPopover = Binding<Bool>(
+                                get: { showBufferTimePopover?.wrappedValue == true && markerForPopover?.wrappedValue?.id == marker.id },
+                                set: { newValue in
+                                    showBufferTimePopover?.wrappedValue = newValue
+                                    if !newValue {
+                                        markerForPopover?.wrappedValue = nil
+                                    }
+                                }
+                            )
 
                             if isActive {
                                 CueMarkerVisualization(
@@ -159,14 +178,22 @@ struct HorizontalMarkerStripWithAutoScroll: View {
                                     onTap: { onTap(marker) },
                                     onEdit: onMarkerEdit != nil ? { onMarkerEdit?(marker) } : nil,
                                     onDelete: onMarkerDelete != nil ? { onMarkerDelete?(marker) } : nil,
-                                    meshColors: meshColors
+                                    meshColors: meshColors,
+                                    showBufferTimePopover: shouldShowPopover,
+                                    bufferTimePopoverContent: bufferTimePopoverContent.map { content in
+                                        { content(marker) }
+                                    }
                                 )
                                 .id(marker.id)
                             } else {
                                 MarkerPill(
                                     marker: marker,
                                     onEdit: onMarkerEdit,
-                                    onDelete: onMarkerDelete
+                                    onDelete: onMarkerDelete,
+                                    showBufferTimePopover: shouldShowPopover,
+                                    bufferTimePopoverContent: bufferTimePopoverContent.map { content in
+                                        { content(marker) }
+                                    }
                                 )
                                 .onTapGesture {
                                     let generator = UIImpactFeedbackGenerator(style: .medium)

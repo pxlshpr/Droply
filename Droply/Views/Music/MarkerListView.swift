@@ -124,6 +124,8 @@ struct MarkerPill: View {
     let marker: SongMarker
     let onEdit: ((SongMarker) -> Void)?
     let onDelete: ((SongMarker) -> Void)?
+    var showBufferTimePopover: Binding<Bool>? // Binding to control popover visibility
+    var bufferTimePopoverContent: (() -> AnyView)? // Content for the popover
 
     var body: some View {
         HStack(spacing: 6) {
@@ -146,6 +148,11 @@ struct MarkerPill: View {
             Capsule()
                 .stroke(.white.opacity(0.3), lineWidth: 1)
         )
+        .popover(isPresented: showBufferTimePopover ?? .constant(false)) {
+            if let content = bufferTimePopoverContent {
+                content()
+            }
+        }
         .contextMenu {
             if let onEdit = onEdit {
                 Button {

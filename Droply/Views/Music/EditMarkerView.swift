@@ -18,6 +18,7 @@ struct EditMarkerView: View {
     @State private var selectedEmoji: String
     @State private var markerName: String
     @State private var timestamp: TimeInterval
+    @State private var cueTime: TimeInterval
 
     private let commonEmojis = [
         "🎵", "🔥", "💪", "🎸", "🎹", "🥁",
@@ -30,7 +31,10 @@ struct EditMarkerView: View {
         _selectedEmoji = State(initialValue: marker.emoji)
         _markerName = State(initialValue: marker.name ?? "")
         _timestamp = State(initialValue: marker.timestamp)
+        _cueTime = State(initialValue: marker.cueTime)
     }
+
+    private let cueTimeOptions: [Double] = [0, 5, 10, 15, 30, 45, 60, 90, 120]
 
     var body: some View {
         NavigationStack {
@@ -74,6 +78,23 @@ struct EditMarkerView: View {
 
                     Section("Name (Optional)") {
                         TextField("e.g., Drop, Solo, Final push", text: $markerName)
+                    }
+
+                    Section {
+                        Picker("Buffer Time", selection: $cueTime) {
+                            ForEach(cueTimeOptions, id: \.self) { time in
+                                Text(formatCueTime(time)).tag(time)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .onChange(of: cueTime) { _, _ in
+                            let generator = UISelectionFeedbackGenerator()
+                            generator.selectionChanged()
+                        }
+                    } header: {
+                        Text("Buffer Time")
+                    } footer: {
+                        Text("Start playing this many seconds before the marker")
                     }
 
                     // Spacer to make room for floating buttons
@@ -161,10 +182,27 @@ struct EditMarkerView: View {
         return String(format: "%d:%02d", minutes, seconds)
     }
 
+    private func formatCueTime(_ seconds: TimeInterval) -> String {
+        if seconds == 0 {
+            return "0s"
+        } else if seconds < 60 {
+            return "\(Int(seconds))s"
+        } else {
+            let minutes = Int(seconds / 60)
+            let remainingSeconds = Int(seconds.truncatingRemainder(dividingBy: 60))
+            if remainingSeconds == 0 {
+                return "\(minutes)m"
+            } else {
+                return "\(minutes)m \(remainingSeconds)s"
+            }
+        }
+    }
+
     private func saveChanges() {
         marker.emoji = selectedEmoji
         marker.name = markerName.isEmpty ? nil : markerName
         marker.timestamp = timestamp
+        marker.cueTime = cueTime
 
         try? modelContext.save()
         dismiss()

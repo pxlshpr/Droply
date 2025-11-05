@@ -49,7 +49,7 @@ struct MarkerTimelineView: View {
                         .offset(x: progressWidth(geometry.size.width) - 8)
                 }
                 .frame(height: 40)
-                .frame(maxHeight: .infinity, alignment: .center)
+                .frame(maxHeight: .infinity, alignment: .bottom)
                 .gesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { value in
@@ -78,7 +78,7 @@ struct MarkerTimelineView: View {
     private func markerView(for marker: SongMarker, geometry: GeometryProxy) -> some View {
         let position = (marker.timestamp / duration) * geometry.size.width
 
-        return VStack(spacing: 1) {
+        return VStack(spacing: 0) {
             Text(marker.emoji)
                 .font(.title3)
                 .background(
@@ -111,8 +111,9 @@ struct MarkerTimelineView: View {
 
             Rectangle()
                 .fill(.white)
-                .frame(width: 2, height: 12)
+                .frame(width: 2, height: 20)
         }
+        .frame(maxHeight: .infinity, alignment: .bottom)
         .offset(x: position - 16)
     }
 
