@@ -17,6 +17,7 @@ struct CueMarkerVisualization: View {
     var meshColors: [Color]? // Optional mesh gradient colors from artwork
     var showBufferTimePopover: Binding<Bool>? // Binding to control popover visibility
     var bufferTimePopoverContent: (() -> AnyView)? // Content for the popover
+    var editMarkerNamespace: Namespace.ID?
 
     @State private var shimmerOffset: CGFloat = -1
 
@@ -100,6 +101,7 @@ struct CueMarkerVisualization: View {
             )
         }
         .buttonStyle(.plain)
+        .modifier(EditMarkerTransitionModifier(marker: marker, namespace: editMarkerNamespace))
         .popover(isPresented: showBufferTimePopover ?? .constant(false)) {
             if let content = bufferTimePopoverContent {
                 content()
@@ -143,6 +145,7 @@ struct HorizontalMarkerStripWithAutoScroll: View {
     var showBufferTimePopover: Binding<Bool>? // Binding to control popover visibility
     var markerForPopover: Binding<SongMarker?>? // Which marker the popover is for
     var bufferTimePopoverContent: ((SongMarker) -> AnyView)? // Content for the popover
+    var editMarkerNamespace: Namespace.ID?
 
     @State private var hasScrolledToActive = false
 
@@ -182,7 +185,8 @@ struct HorizontalMarkerStripWithAutoScroll: View {
                                     showBufferTimePopover: shouldShowPopover,
                                     bufferTimePopoverContent: bufferTimePopoverContent.map { content in
                                         { content(marker) }
-                                    }
+                                    },
+                                    editMarkerNamespace: editMarkerNamespace
                                 )
                                 .id(marker.id)
                             } else {
@@ -193,7 +197,8 @@ struct HorizontalMarkerStripWithAutoScroll: View {
                                     showBufferTimePopover: shouldShowPopover,
                                     bufferTimePopoverContent: bufferTimePopoverContent.map { content in
                                         { content(marker) }
-                                    }
+                                    },
+                                    editMarkerNamespace: editMarkerNamespace
                                 )
                                 .onTapGesture {
                                     let generator = UIImpactFeedbackGenerator(style: .medium)

@@ -19,6 +19,7 @@ struct EditMarkerView: View {
     @State private var markerName: String
     @State private var timestamp: TimeInterval
     @State private var cueTime: TimeInterval
+    @State private var showContent = false
 
     private let commonEmojis = [
         "🎵", "🔥", "💪", "🎸", "🎹", "🥁",
@@ -39,77 +40,9 @@ struct EditMarkerView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Form {
-                    Section {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Position")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                            Text(formatTime(timestamp))
-                                .font(.title2)
-                                .fontWeight(.semibold)
-                                .monospacedDigit()
-                        }
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.vertical, 8)
-                    }
-
-                    Section("Emoji") {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 50))], spacing: 12) {
-                            ForEach(commonEmojis, id: \.self) { emoji in
-                                Text(emoji)
-                                    .font(.largeTitle)
-                                    .frame(width: 50, height: 50)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .fill(selectedEmoji == emoji ? Color.blue.opacity(0.2) : Color.clear)
-                                    )
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .stroke(selectedEmoji == emoji ? Color.blue : Color.clear, lineWidth: 2)
-                                    )
-                                    .onTapGesture {
-                                        selectedEmoji = emoji
-                                    }
-                            }
-                        }
-                        .padding(.vertical, 8)
-                    }
-
-                    Section("Name (Optional)") {
-                        TextField("e.g., Drop, Solo, Final push", text: $markerName)
-                    }
-
-                    Section {
-                        Picker("Buffer Time", selection: $cueTime) {
-                            ForEach(cueTimeOptions, id: \.self) { time in
-                                Text(formatCueTime(time)).tag(time)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                        .onChange(of: cueTime) { _, _ in
-                            let generator = UISelectionFeedbackGenerator()
-                            generator.selectionChanged()
-                        }
-                    } header: {
-                        Text("Buffer Time")
-                    } footer: {
-                        Text("Start playing this many seconds before the marker")
-                    }
-
-                    // Spacer to make room for floating buttons
-                    Section {
-                        Color.clear
-                            .frame(height: 120)
-                    }
-                }
-
-                // Floating buttons
-                VStack(spacing: 12) {
-                    Spacer()
-
-                    seekButtons
-                    saveButton
+                if showContent {
+                    contentView
+                        .transition(.opacity)
                 }
             }
             .navigationTitle("Edit Marker")
@@ -120,6 +53,91 @@ struct EditMarkerView: View {
                         dismiss()
                     }
                 }
+            }
+            .onAppear {
+                Task {
+                    try? await Task.sleep(nanoseconds: 50_000_000) // 0.05 seconds
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showContent = true
+                    }
+                }
+            }
+        }
+    }
+
+    private var contentView: some View {
+        ZStack {
+            Form {
+                Section {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Position")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Text(formatTime(timestamp))
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                            .monospacedDigit()
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 8)
+                }
+
+                Section("Emoji") {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 50))], spacing: 12) {
+                        ForEach(commonEmojis, id: \.self) { emoji in
+                            Text(emoji)
+                                .font(.largeTitle)
+                                .frame(width: 50, height: 50)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(selectedEmoji == emoji ? Color.blue.opacity(0.2) : Color.clear)
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(selectedEmoji == emoji ? Color.blue : Color.clear, lineWidth: 2)
+                                )
+                                .onTapGesture {
+                                    selectedEmoji = emoji
+                                }
+                        }
+                    }
+                    .padding(.vertical, 8)
+                }
+
+                Section("Name (Optional)") {
+                    TextField("e.g., Drop, Solo, Final push", text: $markerName)
+                }
+
+                Section {
+                    Picker("Buffer Time", selection: $cueTime) {
+                        ForEach(cueTimeOptions, id: \.self) { time in
+                            Text(formatCueTime(time)).tag(time)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .onChange(of: cueTime) { _, _ in
+                        let generator = UISelectionFeedbackGenerator()
+                        generator.selectionChanged()
+                    }
+                } header: {
+                    Text("Buffer Time")
+                } footer: {
+                    Text("Start playing this many seconds before the marker")
+                }
+
+                // Spacer to make room for floating buttons
+                Section {
+                    Color.clear
+                        .frame(height: 120)
+                }
+            }
+
+            // Floating buttons
+            VStack(spacing: 12) {
+                Spacer()
+
+                seekButtons
+                saveButton
             }
         }
     }

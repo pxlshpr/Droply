@@ -126,6 +126,7 @@ struct MarkerPill: View {
     let onDelete: ((SongMarker) -> Void)?
     var showBufferTimePopover: Binding<Bool>? // Binding to control popover visibility
     var bufferTimePopoverContent: (() -> AnyView)? // Content for the popover
+    var editMarkerNamespace: Namespace.ID?
 
     var body: some View {
         HStack(spacing: 6) {
@@ -148,6 +149,7 @@ struct MarkerPill: View {
             Capsule()
                 .stroke(.white.opacity(0.3), lineWidth: 1)
         )
+        .modifier(EditMarkerTransitionModifier(marker: marker, namespace: editMarkerNamespace))
         .popover(isPresented: showBufferTimePopover ?? .constant(false)) {
             if let content = bufferTimePopoverContent {
                 content()
@@ -176,6 +178,21 @@ struct MarkerPill: View {
         let minutes = Int(time) / 60
         let seconds = Int(time) % 60
         return String(format: "%d:%02d", minutes, seconds)
+    }
+}
+
+// Helper modifier to conditionally apply matched transition source
+struct EditMarkerTransitionModifier: ViewModifier {
+    let marker: SongMarker
+    let namespace: Namespace.ID?
+
+    func body(content: Content) -> some View {
+        if let namespace = namespace {
+            content
+                .matchedTransitionSource(id: marker.id, in: namespace)
+        } else {
+            content
+        }
     }
 }
 

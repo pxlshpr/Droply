@@ -36,7 +36,7 @@ struct BufferTimeSelectionPopover: View {
                         handleSelection(time)
                     } label: {
                         formatCueTimeLabel(time)
-                            .foregroundStyle(.white)
+//                            .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
                             .frame(height: 70)
                     }

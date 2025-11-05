@@ -15,6 +15,7 @@ struct MarkerTimelineView: View {
     let onMarkerTap: (SongMarker) -> Void
     let onMarkerEdit: ((SongMarker) -> Void)?
     let onMarkerDelete: ((SongMarker) -> Void)?
+    var editMarkerNamespace: Namespace.ID?
 
     @State private var localDragTime: TimeInterval?
 
@@ -79,35 +80,37 @@ struct MarkerTimelineView: View {
         let position = (marker.timestamp / duration) * geometry.size.width
 
         return VStack(spacing: 0) {
-            Text(marker.emoji)
-                .font(.title3)
-                .background(
-                    Circle()
-                        .fill(.white.opacity(0.3))
-                        .frame(width: 32, height: 32)
-                )
-                .onTapGesture {
-                    let generator = UIImpactFeedbackGenerator(style: .medium)
-                    generator.impactOccurred()
-                    onMarkerTap(marker)
-                }
-                .contextMenu {
-                    if let onEdit = onMarkerEdit {
-                        Button {
-                            onEdit(marker)
-                        } label: {
-                            Label("Edit", systemImage: "pencil")
-                        }
+            Group {
+                Text(marker.emoji)
+                    .font(.title3)
+                    .background(
+                        Circle()
+                            .fill(.white.opacity(0.3))
+                            .frame(width: 32, height: 32)
+                    )
+                    .onTapGesture {
+                        let generator = UIImpactFeedbackGenerator(style: .medium)
+                        generator.impactOccurred()
+                        onMarkerTap(marker)
                     }
+                    .contextMenu {
+                        if let onEdit = onMarkerEdit {
+                            Button {
+                                onEdit(marker)
+                            } label: {
+                                Label("Edit", systemImage: "pencil")
+                            }
+                        }
 
-                    if let onDelete = onMarkerDelete {
-                        Button(role: .destructive) {
-                            onDelete(marker)
-                        } label: {
-                            Label("Delete", systemImage: "trash")
+                        if let onDelete = onMarkerDelete {
+                            Button(role: .destructive) {
+                                onDelete(marker)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
                         }
                     }
-                }
+            }
 
             Rectangle()
                 .fill(.white)

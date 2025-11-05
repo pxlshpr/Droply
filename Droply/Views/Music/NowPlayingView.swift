@@ -17,7 +17,6 @@ struct NowPlayingView: View {
     @StateObject private var cueManager = CueVisualizationManager.shared
     @State private var markedSong: MarkedSong?
     @State private var showingAddMarker = false
-    @State private var showingEditMarker = false
     @State private var showingRecentlyMarked = false
     @State private var showingSettings = false
     @State private var showingCueTimeSelector = false
@@ -26,10 +25,12 @@ struct NowPlayingView: View {
     @State private var settingsDetent: PresentationDetent = .medium
     @State private var markerToEdit: SongMarker?
     @State private var selectedMarker: SongMarker?
+    @State private var editMarkerDetent: PresentationDetent = .medium
     @AppStorage("defaultCueTime") private var defaultCueTime: Double = 5.0
     @AppStorage("loopModeEnabled") private var loopModeEnabled: Bool = false
     @AppStorage("loopDuration") private var loopDuration: Double = 10.0
     @Namespace private var recentlyMarkedNamespace
+    @Namespace private var editMarkerNamespace
     @AppStorage("cueVisualizationMode") private var visualizationMode: String = CueVisualizationMode.button.rawValue
 
     // Error handling
@@ -208,11 +209,11 @@ struct NowPlayingView: View {
                             },
                             onMarkerEdit: { marker in
                                 markerToEdit = marker
-                                showingEditMarker = true
                             },
                             onMarkerDelete: { marker in
                                 deleteMarker(marker)
-                            }
+                            },
+                            editMarkerNamespace: editMarkerNamespace
                         )
                         .frame(height: timelineHeight)
                         .padding(.horizontal, 24)
@@ -356,7 +357,6 @@ struct NowPlayingView: View {
                             },
                             onMarkerEdit: { marker in
                                 markerToEdit = marker
-                                showingEditMarker = true
                             },
                             onMarkerDelete: { marker in
                                 deleteMarker(marker)
@@ -366,7 +366,8 @@ struct NowPlayingView: View {
                             markerForPopover: $markerForBufferTimeSelection,
                             bufferTimePopoverContent: { marker in
                                 AnyView(bufferTimePopover(for: marker))
-                            }
+                            },
+                            editMarkerNamespace: editMarkerNamespace
                         )
                         .frame(maxWidth: availableWidth)
                         .padding(.top, 8)
@@ -431,11 +432,11 @@ struct NowPlayingView: View {
                                 onMarkerTap: { _ in },
                                 onMarkerEdit: { marker in
                                     markerToEdit = marker
-                                    showingEditMarker = true
                                 },
                                 onMarkerDelete: { marker in
                                     deleteMarker(marker)
-                                }
+                                },
+                                editMarkerNamespace: editMarkerNamespace
                             )
                             .frame(height: timelineHeight)
                             .padding(.horizontal, 24)
@@ -535,7 +536,6 @@ struct NowPlayingView: View {
                                 },
                                 onMarkerEdit: { marker in
                                     markerToEdit = marker
-                                    showingEditMarker = true
                                 },
                                 onMarkerDelete: { marker in
                                     deleteMarker(marker)
@@ -544,7 +544,8 @@ struct NowPlayingView: View {
                                 markerForPopover: $markerForBufferTimeSelection,
                                 bufferTimePopoverContent: { marker in
                                     AnyView(bufferTimePopover(for: marker))
-                                }
+                                },
+                                editMarkerNamespace: editMarkerNamespace
                             )
                             .frame(maxWidth: availableWidth)
                             .padding(.top, 8)
@@ -613,13 +614,15 @@ struct NowPlayingView: View {
                     )
                 }
             }
-            .sheet(isPresented: $showingEditMarker, onDismiss: {
+            .sheet(item: $markerToEdit, onDismiss: {
                 // Refresh markedSong after editing a marker
                 updateMarkedSong(for: musicService.currentTrack)
-            }) {
-                if let marker = markerToEdit {
-                    EditMarkerView(marker: marker)
-                }
+                editMarkerDetent = .medium
+            }) { marker in
+                EditMarkerView(marker: marker)
+                    .presentationDetents([.medium, .large], selection: $editMarkerDetent)
+                    .presentationBackground(.ultraThinMaterial)
+                    .navigationTransition(.zoom(sourceID: marker.id, in: editMarkerNamespace))
             }
             .sheet(isPresented: $showingRecentlyMarked) {
                 RecentlyMarkedView(namespace: recentlyMarkedNamespace)
@@ -1014,7 +1017,6 @@ struct NowPlayingView: View {
             },
             onEditDrop: {
                 markerToEdit = marker
-                showingEditMarker = true
             },
             backgroundColor1: musicService.backgroundColor1,
             backgroundColor2: musicService.backgroundColor2
