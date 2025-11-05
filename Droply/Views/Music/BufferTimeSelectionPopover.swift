@@ -40,7 +40,8 @@ struct BufferTimeSelectionPopover: View {
                             .frame(maxWidth: .infinity)
                             .frame(height: 70)
                     }
-                    .buttonStyle(.glassProminent)
+                    .glassEffect(.regular.interactive().tint(Color.accentColor), in: RoundedRectangle(cornerRadius: 10))
+//                    .buttonStyle(.glassProminent)
                 }
             }
 
@@ -54,7 +55,6 @@ struct BufferTimeSelectionPopover: View {
             } label: {
                 Label("Edit Drop", systemImage: "pencil")
                     .font(.body)
-                    .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: 44)
             }
