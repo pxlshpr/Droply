@@ -40,7 +40,8 @@ struct BufferTimeSelectionPopover: View {
                             .frame(maxWidth: .infinity)
                             .frame(height: 70)
                     }
-                    .glassEffect(.regular.interactive().tint(Color.accentColor), in: RoundedRectangle(cornerRadius: 10))
+                    .buttonStyle(.glass)
+//                    .glassEffect(.regular.interactive().tint(Color.accentColor), in: RoundedRectangle(cornerRadius: 10))
 //                    .buttonStyle(.glassProminent)
                 }
             }
@@ -63,24 +64,21 @@ struct BufferTimeSelectionPopover: View {
         .padding(20)
         .frame(width: 320)
         .presentationCompactAdaptation(.popover)
-        
-//        .presentationBackground(
-//            LinearGradient(
-//                colors: [backgroundColor1, backgroundColor2],
-//                startPoint: .topLeading,
-//                endPoint: .bottomTrailing
-//            )
-//        )
+        .presentationBackground(.ultraThickMaterial)
+        .environment(\.colorScheme, .dark)
     }
 
     private func handleSelection(_ time: TimeInterval) {
-        // Haptic feedback
-        let generator = UISelectionFeedbackGenerator()
-        generator.selectionChanged()
+        // Immediate rigid haptic feedback - fires before any other code
+        let generator = UIImpactFeedbackGenerator(style: .heavy)
+        generator.impactOccurred()
 
-        // Dismiss and perform action
-        dismiss()
-        onSelect(time)
+        // Small delay to ensure haptic completes before dismissal
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            // Dismiss and perform action
+            dismiss()
+            onSelect(time)
+        }
     }
 
     @ViewBuilder

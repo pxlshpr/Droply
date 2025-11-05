@@ -151,6 +151,7 @@ struct MarkerPill: View {
         .popover(isPresented: showBufferTimePopover ?? .constant(false)) {
             if let content = bufferTimePopoverContent {
                 content()
+                    .environment(\.colorScheme, .dark)
             }
         }
         .contextMenu {

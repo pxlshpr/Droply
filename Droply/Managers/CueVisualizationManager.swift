@@ -165,7 +165,7 @@ class CueVisualizationManager: ObservableObject {
     }
 
     private func triggerMarkerHaptic() {
-        let generator = UIImpactFeedbackGenerator(style: .heavy)
+        let generator = UIImpactFeedbackGenerator(style: .soft)
         generator.prepare()
         generator.impactOccurred(intensity: 1.0)
     }
