@@ -31,6 +31,7 @@ struct BufferTimeSelectionPopover: View {
             } label: {
                 Label("Edit Drop", systemImage: "pencil")
                     .font(.body)
+                    .foregroundStyle(.primary)
                     .frame(maxWidth: .infinity)
                     .frame(height: 44)
             }
