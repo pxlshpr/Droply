@@ -183,13 +183,35 @@ struct NowPlayingView: View {
                             onMarkerTap: { marker in
                                 selectedMarker = marker
                                 Task {
-                                    let startTime = max(0, marker.timestamp - marker.cueTime)
-                                    await musicService.seek(to: startTime)
-
                                     do {
-                                        try await musicService.play()
+                                        // Check if the marker's song is the current track
+                                        guard let markerSong = marker.song else {
+                                            showError(.playbackFailed)
+                                            return
+                                        }
+
+                                        let currentTrackID = musicService.currentTrack?.id
+                                        let markerSongID = markerSong.isAppleMusic ? markerSong.appleMusicID : markerSong.persistentID
+                                        let isSameSong = currentTrackID == markerSongID
+
+                                        // If the song is already loaded and playing, just seek to the marker
+                                        if isSameSong && musicService.isPlaying {
+                                            let startTime = max(0, marker.timestamp - marker.cueTime)
+                                            await musicService.seek(to: startTime)
+                                        } else {
+                                            // Otherwise, use the same approach as the play button (togglePlayPause)
+                                            // This handles audio session and queue state properly
+                                            try await musicService.togglePlayPause()
+
+                                            // Wait for playback to start, then seek to marker position
+                                            try await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
+
+                                            let startTime = max(0, marker.timestamp - marker.cueTime)
+                                            await musicService.seek(to: startTime)
+                                        }
 
                                         // Start cue visualization
+                                        let startTime = max(0, marker.timestamp - marker.cueTime)
                                         cueManager.startCue(
                                             for: marker,
                                             defaultCueTime: marker.cueTime,

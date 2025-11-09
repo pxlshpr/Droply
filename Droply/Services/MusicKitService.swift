@@ -11,6 +11,7 @@ import Combine
 import OSLog
 import MediaPlayer
 import SwiftUI
+import AVFoundation
 
 @Observable
 @MainActor
@@ -62,6 +63,10 @@ class MusicKitService {
     // Track the ID of the song we're expecting to play
     // While set, system player updates for different tracks are ignored
     private var expectedTrackID: String?
+
+    // Cache for extracted color palettes to ensure consistent gradients across loads
+    // Key: track.id, Value: tuple of (backgroundColors, meshColors, backgroundMeshColors)
+    private var colorPaletteCache: [String: (Color, Color, [Color]?, [Color]?)] = [:]
 
     private init() {
         logger.info("MusicKitService initializing")
@@ -372,8 +377,37 @@ class MusicKitService {
 
     // MARK: - Playback Control
 
+    /// Configure audio session for playback
+    /// This ensures the app can play audio even after other apps have used the audio session
+    private func configureAudioSession() throws {
+        let audioSession = AVAudioSession.sharedInstance()
+
+        do {
+            // Set category to playback with mixWithOthers option removed to take exclusive control
+            // This ensures we properly take over the audio session from other apps
+            try audioSession.setCategory(.playback, mode: .default, options: [])
+
+            // Activate the audio session
+            try audioSession.setActive(true, options: [])
+
+            logger.debug("Audio session configured and activated successfully")
+        } catch {
+            logger.error("Failed to configure audio session: \(error.localizedDescription)")
+            throw error
+        }
+    }
+
     func play() async throws {
         logger.info("Attempting to play")
+
+        // Configure audio session before playing
+        // This is critical for playback to work after other apps have used audio
+        do {
+            try configureAudioSession()
+        } catch {
+            logger.error("Failed to configure audio session, attempting to play anyway: \(error.localizedDescription)")
+            // Don't throw - try to play anyway as it might still work
+        }
 
         // Determine which player is active
         if systemPlayer.playbackState != .stopped && (systemPlayer.playbackState == .playing || systemPlayer.nowPlayingItem != nil) {
@@ -413,6 +447,15 @@ class MusicKitService {
 
     func togglePlayPause() async throws {
         logger.info("Toggling play/pause - current state: \(self.isPlaying ? "playing" : "paused")")
+
+        // Configure audio session before toggling (especially important when resuming)
+        if !isPlaying {
+            do {
+                try configureAudioSession()
+            } catch {
+                logger.error("Failed to configure audio session in togglePlayPause, attempting anyway: \(error.localizedDescription)")
+            }
+        }
 
         // Determine which player is active
         if systemPlayer.playbackState == .playing || systemPlayer.nowPlayingItem != nil {
@@ -1086,6 +1129,16 @@ class MusicKitService {
             return
         }
 
+        // Check cache first for consistent colors across loads
+        if let cached = colorPaletteCache[track.id] {
+            logger.debug("Using cached color palette for track: \(track.id)")
+            backgroundColor1 = cached.0
+            backgroundColor2 = cached.1
+            meshColors = cached.2
+            backgroundMeshColors = cached.3
+            return
+        }
+
         // Get UIImage from artwork based on track type
         var artworkImage: UIImage?
 
@@ -1108,7 +1161,9 @@ class MusicKitService {
 
         case .mediaPlayer(let artwork):
             // For local tracks, get the image directly from MPMediaItemArtwork
-            artworkImage = artwork?.image(at: CGSize(width: 300, height: 300))
+            // Request larger size (600x600) to ensure we get high-resolution artwork
+            // and consistent color extraction results
+            artworkImage = artwork?.image(at: CGSize(width: 600, height: 600))
 
         case .cachedURL(let urlString):
             // For cached tracks, download the artwork from the cached URL
@@ -1146,11 +1201,19 @@ class MusicKitService {
                 Color(uiColor: $0)
                     .opacity(0.3)
             }
+
+            // Cache the extracted colors for consistent gradients on subsequent loads
+            colorPaletteCache[track.id] = (backgroundColor1, backgroundColor2, meshColors, backgroundMeshColors)
+            logger.debug("Cached color palette for track: \(track.id)")
         } else {
             // Fallback to old method if palette extraction fails
             if let colors = await ColorExtractor.extractColors(from: image) {
                 backgroundColor1 = Color(uiColor: colors.color1)
                 backgroundColor2 = Color(uiColor: colors.color2)
+
+                // Cache the fallback colors too (with no mesh colors)
+                colorPaletteCache[track.id] = (backgroundColor1, backgroundColor2, nil, nil)
+                logger.debug("Cached fallback colors for track: \(track.id)")
             }
         }
     }
