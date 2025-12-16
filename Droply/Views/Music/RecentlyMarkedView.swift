@@ -82,7 +82,14 @@ struct RecentlyMarkedView: View {
                     } else {
                         List {
                             ForEach(groupedSongs, id: \.period) { group in
-                                Section(header: Text(group.period)) {
+                                Section(header:
+                                    Text(group.period)
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(.secondary)
+                                        .textCase(.uppercase)
+                                        .padding(.top, 8)
+                                        .padding(.bottom, 4)
+                                ) {
                                     ForEach(group.songs) { song in
                                         Button {
                                             // Haptic feedback FIRST for instant tactile response
@@ -112,6 +119,7 @@ struct RecentlyMarkedView: View {
                                                 .contentShape(Rectangle())
                                         }
                                         .buttonStyle(SongRowButtonStyle())
+                                        .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
                                     }
                                 }
                             }
