@@ -193,9 +193,17 @@ struct FloatingNowPlayingBar: View {
         .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
         .contentShape(Rectangle())
         .onTapGesture {
+            let tapTime = timestamp()
+            logger.info("[\(tapTime)] 👆 FloatingNowPlayingBar tapped")
+
             // Only allow tapping to view now playing if track is loaded
             if musicService.currentTrack != nil {
+                logger.info("[\(tapTime)] ✅ Current track exists, calling onTap()")
                 onTap()
+                let afterTapTime = timestamp()
+                logger.info("[\(afterTapTime)] 📲 onTap() completed")
+            } else {
+                logger.debug("[\(tapTime)] ⚠️ No current track, tap ignored")
             }
         }
     }

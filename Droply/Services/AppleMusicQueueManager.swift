@@ -150,18 +150,9 @@ class AppleMusicQueueManager {
             }
 
             do {
-                // prepareToPlay() is async and must be called on main thread - but we're already off main
-                // So we need to switch to main for the entire async operation
-                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                    Task { @MainActor in
-                        do {
-                            try await systemPlayer.prepareToPlay()
-                            continuation.resume()
-                        } catch {
-                            continuation.resume(throwing: error)
-                        }
-                    }
-                }
+                // prepareToPlay() runs async - call it off main thread to avoid UI blocking
+                // Only the setQueue call needs main thread, prepareToPlay can run in background
+                try await systemPlayer.prepareToPlay()
                 logger.info("Successfully prepared to play: \(item.title)")
             } catch {
                 logger.error("Failed to prepare playback for \(item.title): \(error.localizedDescription)")
@@ -171,20 +162,20 @@ class AppleMusicQueueManager {
             // Library item - need to look it up (this happens off main thread)
             logger.debug("Looking up library item")
             if let mediaItem = await findLibraryItem(for: item) {
-                // Set queue and prepare on main thread
-                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                    Task { @MainActor in
-                        do {
-                            let descriptor = MPMusicPlayerMediaItemQueueDescriptor(
-                                itemCollection: .init(items: [mediaItem])
-                            )
-                            systemPlayer.setQueue(with: descriptor)
-                            try await systemPlayer.prepareToPlay()
-                            continuation.resume()
-                        } catch {
-                            continuation.resume(throwing: error)
-                        }
-                    }
+                // Set queue on main thread, but prepare to play off main thread
+                await MainActor.run {
+                    let descriptor = MPMusicPlayerMediaItemQueueDescriptor(
+                        itemCollection: .init(items: [mediaItem])
+                    )
+                    systemPlayer.setQueue(with: descriptor)
+                }
+
+                do {
+                    // prepareToPlay runs async off main thread to avoid UI blocking
+                    try await systemPlayer.prepareToPlay()
+                } catch {
+                    logger.error("Failed to prepare playback for library item: \(error.localizedDescription)")
+                    throw error
                 }
             } else {
                 logger.error("Could not find library item for: \(item.title)")

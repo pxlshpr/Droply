@@ -88,6 +88,17 @@ struct ContentView: View {
     private var mainView: some View {
         NavigationStack {
             ZStack(alignment: .bottom) {
+                // Gradient background for dark mode (using Material Design recommended colors)
+                LinearGradient(
+                    colors: [
+                        Color(hex: "#1a1a1a"),
+                        Color(hex: "#121212")
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+
                 // Main content - Recently marked songs list
                 Group {
                     if recentlyMarkedSongs.isEmpty {
@@ -146,10 +157,14 @@ struct ContentView: View {
                                             // Cancel any existing play task
                                             currentPlayTask?.cancel()
 
-                                            // Create new play task
-                                            currentPlayTask = Task {
+                                            // Create new play task - DETACHED to run off main thread
+                                            let preDetachedTime = timestamp()
+                                            logger.debug("[\(preDetachedTime)] 🚀 Creating detached task for playSong")
+                                            currentPlayTask = Task.detached(priority: .userInitiated) {
                                                 await playSong(song)
                                             }
+                                            let postDetachedTime = timestamp()
+                                            logger.info("[\(postDetachedTime)] ✅ Detached task created")
                                         } label: {
                                             RecentlyMarkedRow(song: song)
                                                 .contentShape(Rectangle())
@@ -161,6 +176,7 @@ struct ContentView: View {
                             }
                         }
                         .listStyle(.plain)
+                        .scrollContentBackground(.hidden)
                         .safeAreaInset(edge: .bottom) {
                             // Add padding for the floating bar (always visible)
                             Color.clear.frame(height: 80)
@@ -172,7 +188,11 @@ struct ContentView: View {
                 VStack {
                     Spacer()
                     FloatingNowPlayingBar {
+                        let time = timestamp()
+                        logger.info("[\(time)] 🎭 FloatingNowPlayingBar onTap closure called")
                         showingNowPlaying = true
+                        let afterTime = timestamp()
+                        logger.info("[\(afterTime)] 🎭 showingNowPlaying set to true")
                     }
                     .padding(.horizontal, 12)
                     .padding(.bottom, 12)
@@ -207,7 +227,8 @@ struct ContentView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 16) {
                         Button {
-                            Task {
+                            // Use detached task to run off main thread and avoid UI blocking
+                            Task.detached(priority: .userInitiated) {
                                 await playAllSongs()
                             }
                         } label: {
@@ -224,7 +245,7 @@ struct ContentView: View {
                 }
             }
             .sheet(isPresented: $showingNowPlaying) {
-                NowPlayingView()
+                nowPlayingSheet
             }
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
@@ -276,17 +297,29 @@ struct ContentView: View {
                 }
             }
 
-            // Update last played at for all songs
-            for markedSong in recentlyMarkedSongs {
-                markedSong.lastPlayedAt = Date()
+            // Update last played at for all songs (must run on main thread for SwiftData)
+            await MainActor.run {
+                for markedSong in recentlyMarkedSongs {
+                    markedSong.lastPlayedAt = Date()
+                }
+                try? modelContext.save()
             }
-            try? modelContext.save()
         } catch {
             print("Failed to play songs: \(error.localizedDescription)")
         }
     }
 
     // MARK: - Helper Properties
+
+    private var nowPlayingSheet: some View {
+        let sheetTime = timestamp()
+        logger.info("[\(sheetTime)] 📄 Sheet presentation triggered, creating NowPlayingView")
+        return NowPlayingView()
+            .onAppear {
+                let appearTime = timestamp()
+                logger.info("[\(appearTime)] 👁️ NowPlayingView appeared on screen")
+            }
+    }
 
     private var groupedSongs: [(period: String, songs: [MarkedSong])] {
         let now = Date()
@@ -409,9 +442,11 @@ struct ContentView: View {
                 }
             }
 
-            // Update last played at for the tapped song
-            markedSong.lastPlayedAt = Date()
-            try? modelContext.save()
+            // Update last played at for the tapped song (must run on main thread for SwiftData)
+            await MainActor.run {
+                markedSong.lastPlayedAt = Date()
+                try? modelContext.save()
+            }
         } catch is CancellationError {
             // Task was cancelled - this is expected when user taps another song quickly
             print("⏸️ Play song task was cancelled")

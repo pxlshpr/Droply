@@ -723,8 +723,15 @@ struct NowPlayingView: View {
                 updateMarkedSong(for: newTrack)
             }
             .onAppear {
-                migrateLegacySongs()
+                // Defer heavy operations to background to avoid blocking UI
+                Task.detached(priority: .userInitiated) {
+                    await migrateLegacySongsAsync()
+                }
+
+                // Update marked song synchronously (fast lookup)
                 updateMarkedSong(for: musicService.currentTrack)
+
+                // Setup cue manager (fast operation)
                 cueManager.setup(musicService: musicService)
             }
             .fullScreenCover(isPresented: $cueManager.showFullscreenVisualization) {
@@ -1209,6 +1216,13 @@ struct NowPlayingView: View {
         } catch {
             print("Failed to migrate legacy songs: \(error)")
             // Don't show error for migration as it's a background operation
+        }
+    }
+
+    private func migrateLegacySongsAsync() async {
+        // Run on main actor to access SwiftData
+        await MainActor.run {
+            migrateLegacySongs()
         }
     }
 }

@@ -110,8 +110,8 @@ struct RecentlyMarkedView: View {
                                             // Cancel any existing play task
                                             currentPlayTask?.cancel()
 
-                                            // Create new play task
-                                            currentPlayTask = Task {
+                                            // Create new play task - DETACHED to run off main thread
+                                            currentPlayTask = Task.detached(priority: .userInitiated) {
                                                 await playSong(song)
                                             }
                                         } label: {
@@ -175,7 +175,8 @@ struct RecentlyMarkedView: View {
                 ToolbarSpacer(placement: .bottomBar)
                 ToolbarItem(placement: .bottomBar) {
                     Button {
-                        Task {
+                        // Use detached task to run off main thread and avoid UI blocking
+                        Task.detached(priority: .userInitiated) {
                             await playAllSongs()
                         }
                     } label: {
@@ -194,8 +195,10 @@ struct RecentlyMarkedView: View {
     }
 
     private func playSong(_ markedSong: MarkedSong) async {
-        // Dismiss immediately for responsive feel
-        dismiss()
+        // Dismiss immediately for responsive feel (must run on main thread)
+        await MainActor.run {
+            dismiss()
+        }
 
         do {
             // Check for cancellation before proceeding
@@ -281,9 +284,11 @@ struct RecentlyMarkedView: View {
                 }
             }
 
-            // Update last played at for the tapped song
-            markedSong.lastPlayedAt = Date()
-            try? modelContext.save()
+            // Update last played at for the tapped song (must run on main thread for SwiftData)
+            await MainActor.run {
+                markedSong.lastPlayedAt = Date()
+                try? modelContext.save()
+            }
         } catch is CancellationError {
             // Task was cancelled - this is expected when user taps another song quickly
             print("Play song task was cancelled")
@@ -293,8 +298,10 @@ struct RecentlyMarkedView: View {
     }
 
     private func playAllSongs() async {
-        // Dismiss immediately for responsive feel
-        dismiss()
+        // Dismiss immediately for responsive feel (must run on main thread)
+        await MainActor.run {
+            dismiss()
+        }
 
         do {
             // Separate Apple Music and local tracks
@@ -358,11 +365,13 @@ struct RecentlyMarkedView: View {
                 }
             }
 
-            // Update last played at for all songs
-            for markedSong in recentlyMarkedSongs {
-                markedSong.lastPlayedAt = Date()
+            // Update last played at for all songs (must run on main thread for SwiftData)
+            await MainActor.run {
+                for markedSong in recentlyMarkedSongs {
+                    markedSong.lastPlayedAt = Date()
+                }
+                try? modelContext.save()
             }
-            try? modelContext.save()
         } catch {
             playbackErrorLogger.error("Failed to play songs: \(error.localizedDescription)")
         }
@@ -447,7 +456,7 @@ struct RecentlyMarkedRow: View {
             // Marker timeline visualization
             SongMarkerPreview(song: song)
         }
-        .padding(.vertical, 0)
+        .padding(.vertical, 6)
     }
 
     private var placeholderArtwork: some View {
