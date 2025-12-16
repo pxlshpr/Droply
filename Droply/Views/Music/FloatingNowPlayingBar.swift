@@ -196,14 +196,14 @@ struct FloatingNowPlayingBar: View {
             let tapTime = timestamp()
             logger.info("[\(tapTime)] 👆 FloatingNowPlayingBar tapped")
 
-            // Only allow tapping to view now playing if track is loaded
-            if musicService.currentTrack != nil {
-                logger.info("[\(tapTime)] ✅ Current track exists, calling onTap()")
+            // Allow tapping when either current track OR pending track exists
+            if musicService.currentTrack != nil || musicService.pendingTrack != nil {
+                logger.info("[\(tapTime)] ✅ Track exists (current or pending), calling onTap()")
                 onTap()
                 let afterTapTime = timestamp()
                 logger.info("[\(afterTapTime)] 📲 onTap() completed")
             } else {
-                logger.debug("[\(tapTime)] ⚠️ No current track, tap ignored")
+                logger.debug("[\(tapTime)] ⚠️ No track (current or pending), tap ignored")
             }
         }
     }
