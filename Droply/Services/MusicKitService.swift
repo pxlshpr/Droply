@@ -610,6 +610,22 @@ class MusicKitService {
 
         let preSetTrackTime = timestamp()
         logger.debug("[\(preSetTrackTime)] 🎵 Setting pending track...")
+
+        // Check if colors are already cached - if so, use them immediately
+        if let cached = colorPaletteCache[cachedTrack.id] {
+            logger.debug("Using cached color palette for track: \(cachedTrack.id)")
+            backgroundColor1 = cached.0
+            backgroundColor2 = cached.1
+            meshColors = cached.2
+            backgroundMeshColors = cached.3
+        } else if let artworkURL = metadata.artworkURL, !artworkURL.isEmpty {
+            // Extract colors BEFORE setting pending track if we have cached artwork
+            // Start color extraction with high priority, but don't block
+            Task(priority: .userInitiated) {
+                await self.extractColorsFromCachedArtwork(trackId: cachedTrack.id, artworkURL: artworkURL)
+            }
+        }
+
         setPendingTrack(cachedTrack)
         logger.debug("📊 After setPendingTrack: pendingTrack.title = \(self.pendingTrack?.title ?? "nil")")
         logger.debug("📊 After setPendingTrack: pendingTrack.artistName = \(self.pendingTrack?.artistName ?? "nil")")
@@ -736,6 +752,11 @@ class MusicKitService {
                 // Task was cancelled, which is fine
                 logger.debug("Pending track grace period task cancelled")
             }
+        }
+
+        // Extract colors from cached artwork immediately so gradient is ready when view appears
+        Task {
+            await extractColorsFromArtwork(for: track)
         }
     }
 
@@ -1118,6 +1139,64 @@ class MusicKitService {
     }
 
     // MARK: - Color Extraction
+
+    /// Extract colors from cached artwork URL with high priority
+    /// This is called immediately when loading a song from cache to ensure colors are ready before view appears
+    private func extractColorsFromCachedArtwork(trackId: String, artworkURL: String) async {
+        // Check cache first for instant colors
+        if let cached = colorPaletteCache[trackId] {
+            await MainActor.run {
+                logger.debug("Using cached color palette for track: \(trackId)")
+                backgroundColor1 = cached.0
+                backgroundColor2 = cached.1
+                meshColors = cached.2
+                backgroundMeshColors = cached.3
+            }
+            return
+        }
+
+        // Download and extract colors from cached artwork URL
+        guard let url = URL(string: artworkURL) else {
+            logger.warning("Invalid cached artwork URL: \(artworkURL)")
+            return
+        }
+
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            guard let image = UIImage(data: data) else {
+                logger.warning("Failed to create UIImage from artwork data")
+                return
+            }
+
+            // Extract comprehensive color palette
+            if let palette = await ColorExtractor.extractColorPalette(from: image) {
+                await MainActor.run {
+                    // Update colors
+                    backgroundColor1 = Color(uiColor: palette.backgroundColors.color1)
+                    backgroundColor2 = Color(uiColor: palette.backgroundColors.color2)
+                    meshColors = palette.vibrantMeshColors.map { Color(uiColor: $0) }
+                    backgroundMeshColors = palette.meshColors.map {
+                        Color(uiColor: $0)
+                            .opacity(0.3)
+                    }
+
+                    // Cache the extracted colors
+                    colorPaletteCache[trackId] = (backgroundColor1, backgroundColor2, meshColors, backgroundMeshColors)
+                    logger.debug("Cached color palette for track: \(trackId)")
+                }
+            } else if let colors = await ColorExtractor.extractColors(from: image) {
+                // Fallback to old method if palette extraction fails
+                await MainActor.run {
+                    backgroundColor1 = Color(uiColor: colors.color1)
+                    backgroundColor2 = Color(uiColor: colors.color2)
+                    colorPaletteCache[trackId] = (backgroundColor1, backgroundColor2, nil, nil)
+                    logger.debug("Cached fallback colors for track: \(trackId)")
+                }
+            }
+        } catch {
+            logger.error("Failed to extract colors from cached artwork: \(error.localizedDescription)")
+        }
+    }
 
     private func extractColorsFromArtwork(for track: PlayableTrack?) async {
         guard let track = track else {

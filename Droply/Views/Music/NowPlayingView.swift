@@ -97,14 +97,18 @@ struct NowPlayingView: View {
                     let displayTitle = track?.title ?? musicService.pendingMarkedSong?.title ?? "Unknown"
                     let displayArtist = track?.artistName ?? musicService.pendingMarkedSong?.artist ?? "Unknown"
 
-                    // Calculate available space accounting for safe areas
+                    // Calculate available space accounting for safe areas and overlay buttons
+                    let topSafeArea = geometry.safeAreaInsets.top
                     let bottomSafeArea = max(geometry.safeAreaInsets.bottom, 20) // Minimum 20pt padding
-                    let availableHeight = geometry.size.height - bottomSafeArea
+                    let overlayButtonHeight: CGFloat = 48 + 8 // Button height + top padding
+                    let topReservedSpace = topSafeArea + overlayButtonHeight
+                    let availableHeight = geometry.size.height - bottomSafeArea - topReservedSpace
                     let availableWidth = geometry.size.width
 
                     // Calculate sizes - maximize artwork while fitting width
+                    // Increased from 45% to 50% to take advantage of full-screen space
                     let maxArtworkFromWidth = availableWidth - 32 // Account for horizontal padding
-                    let maxArtworkFromHeight = availableHeight * 0.45 // Use 45% of height
+                    let maxArtworkFromHeight = availableHeight * 0.50 // Use 50% of available height
                     let artworkSize = min(maxArtworkFromWidth, maxArtworkFromHeight)
 
                     let timelineHeight: CGFloat = 40
@@ -125,6 +129,9 @@ struct NowPlayingView: View {
                     let playButtonSize: CGFloat = min(60, markerButtonUnit * 1.0)
 
                     VStack(spacing: 0) {
+                        // Top spacing to avoid overlay buttons
+                        Color.clear.frame(height: topReservedSpace)
+
                         // Album artwork - show placeholder if only pending marked song
                         if let track = track {
                             albumArtwork(for: track, cachedArtworkURL: markedSong?.artworkURL)
@@ -399,12 +406,15 @@ struct NowPlayingView: View {
                     .padding(.bottom, bottomSafeArea + 8)
                 } else if isPreview {
                     // Preview mode with dummy data
+                    let topSafeArea = geometry.safeAreaInsets.top
                     let bottomSafeArea = max(geometry.safeAreaInsets.bottom, 20)
-                    let availableHeight = geometry.size.height - bottomSafeArea
+                    let overlayButtonHeight: CGFloat = 48 + 8
+                    let topReservedSpace = topSafeArea + overlayButtonHeight
+                    let availableHeight = geometry.size.height - bottomSafeArea - topReservedSpace
                     let availableWidth = geometry.size.width
 
                     let maxArtworkFromWidth = availableWidth - 32
-                    let maxArtworkFromHeight = availableHeight * 0.45
+                    let maxArtworkFromHeight = availableHeight * 0.50
                     let artworkSize = min(maxArtworkFromWidth, maxArtworkFromHeight)
 
                     let timelineHeight: CGFloat = 40
@@ -420,6 +430,9 @@ struct NowPlayingView: View {
                     let playButtonSize: CGFloat = min(60, markerButtonUnit * 1.0)
 
                     VStack(spacing: 0) {
+                        // Top spacing to avoid overlay buttons
+                        Color.clear.frame(height: topReservedSpace)
+
                         // Album artwork (black square for preview)
                         RoundedRectangle(cornerRadius: 12)
                             .fill(Color.black)
@@ -599,46 +612,47 @@ struct NowPlayingView: View {
                     )
                     .transition(.opacity)
                 }
-            }
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        showingSettings = true
-                    } label: {
-                        Image(systemName: "gearshape")
-                            .font(.title3)
-                            .foregroundStyle(.white)
-                    }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showingRecentlyMarked = true
-                    } label: {
-                        Image(systemName: "clock.arrow.circlepath")
-                            .font(.title3)
-                            .foregroundStyle(.white)
-                    }
-                }
-                .matchedTransitionSource(id: "recentlyMarked", in: recentlyMarkedNamespace)
 
-//                ToolbarItem(placement: .bottomBar) {
-//                    Button {
-//                        showingCueTimeSelector = true
-//                    } label: {
-//                        HStack(spacing: 4) {
-//                            Image(systemName: "timer")
-//                            Text(formatCueTime(defaultCueTime))
-//                                .font(.subheadline)
-//                                .fontWeight(.medium)
-//                        }
-//                    }
-//                    .frame(maxWidth: .infinity, alignment: .leading)
-//                    .opacity(currentVisualizationMode == .button ? 0 : 1)
-//                }
+                // Overlay buttons for settings and recently marked (top corners)
+                VStack {
+                    HStack(alignment: .top) {
+                        // Settings button (top leading)
+                        Button {
+                            showingSettings = true
+                        } label: {
+                            Image(systemName: "gearshape")
+                                .font(.title3)
+                                .foregroundStyle(.white)
+                                .padding(12)
+                                .background(.ultraThinMaterial.opacity(0.6))
+                                .clipShape(Circle())
+                        }
+                        .padding(.leading, 16)
+                        .padding(.top, geometry.safeAreaInsets.top + 8)
+
+                        Spacer()
+
+                        // Recently marked button (top trailing)
+                        Button {
+                            showingRecentlyMarked = true
+                        } label: {
+                            Image(systemName: "clock.arrow.circlepath")
+                                .font(.title3)
+                                .foregroundStyle(.white)
+                                .padding(12)
+                                .background(.ultraThinMaterial.opacity(0.6))
+                                .clipShape(Circle())
+                        }
+                        .matchedTransitionSource(id: "recentlyMarked", in: recentlyMarkedNamespace)
+                        .padding(.trailing, 16)
+                        .padding(.top, geometry.safeAreaInsets.top + 8)
+                    }
+
+                    Spacer()
+                }
             }
-            .toolbarBackground(.visible, for: .bottomBar)
+            }
+            .navigationBarHidden(true)
             .sheet(isPresented: $showingAddMarker, onDismiss: {
                 // Refresh markedSong after adding a marker
                 updateMarkedSong(for: musicService.currentTrack)

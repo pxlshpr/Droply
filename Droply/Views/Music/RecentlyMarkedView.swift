@@ -102,17 +102,27 @@ struct RecentlyMarkedView: View {
                                             // Set cached metadata instantly (synchronous, no Task delay)
                                             musicService.setTrackMetadataFromCache(metadata)
 
-                                            // Fetch fresh metadata from API in background (non-blocking)
+                                            // Small delay to allow color extraction to start before dismiss
                                             Task {
-                                                await musicService.fetchFreshTrackMetadata(metadata)
+                                                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+                                                dismiss()
                                             }
 
-                                            // Cancel any existing play task
-                                            currentPlayTask?.cancel()
+                                            // Now do all the background work in parallel
+                                            Task {
+                                                // Small delay to ensure view transition completes
+                                                try? await Task.sleep(nanoseconds: 150_000_000) // 0.15 seconds
 
-                                            // Create new play task - DETACHED to run off main thread
-                                            currentPlayTask = Task.detached(priority: .userInitiated) {
-                                                await playSong(song)
+                                                // Fetch fresh metadata from API in background (non-blocking)
+                                                await musicService.fetchFreshTrackMetadata(metadata)
+
+                                                // Cancel any existing play task
+                                                currentPlayTask?.cancel()
+
+                                                // Create new play task - DETACHED to run off main thread
+                                                currentPlayTask = Task.detached(priority: .userInitiated) {
+                                                    await playSong(song)
+                                                }
                                             }
                                         } label: {
                                             RecentlyMarkedRow(song: song)
@@ -120,6 +130,7 @@ struct RecentlyMarkedView: View {
                                         }
                                         .buttonStyle(SongRowButtonStyle())
                                         .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
+                                        .listRowBackground(Color.clear)
                                     }
                                 }
                             }
@@ -175,8 +186,15 @@ struct RecentlyMarkedView: View {
                 ToolbarSpacer(placement: .bottomBar)
                 ToolbarItem(placement: .bottomBar) {
                     Button {
-                        // Use detached task to run off main thread and avoid UI blocking
-                        Task.detached(priority: .userInitiated) {
+                        // Dismiss immediately to show now playing view BEFORE doing background work
+                        dismiss()
+
+                        // Do background work AFTER sheet is dismissed
+                        Task {
+                            // Small delay to ensure sheet has dismissed and now playing is visible
+                            try? await Task.sleep(nanoseconds: 50_000_000) // 0.05 seconds
+
+                            // Use detached task to run off main thread and avoid UI blocking
                             await playAllSongs()
                         }
                     } label: {
@@ -195,11 +213,6 @@ struct RecentlyMarkedView: View {
     }
 
     private func playSong(_ markedSong: MarkedSong) async {
-        // Dismiss immediately for responsive feel (must run on main thread)
-        await MainActor.run {
-            dismiss()
-        }
-
         do {
             // Check for cancellation before proceeding
             try Task.checkCancellation()
@@ -298,11 +311,6 @@ struct RecentlyMarkedView: View {
     }
 
     private func playAllSongs() async {
-        // Dismiss immediately for responsive feel (must run on main thread)
-        await MainActor.run {
-            dismiss()
-        }
-
         do {
             // Separate Apple Music and local tracks
             var appleMusicSongs: [Song] = []

@@ -143,34 +143,40 @@ struct ContentView: View {
                                             let cacheSetTime = timestamp()
                                             logger.info("[\(cacheSetTime)] ✅ Cached metadata set instantly!")
 
-                                            // Fetch fresh metadata from API in background (non-blocking)
-                                            let preTaskTime = timestamp()
-                                            logger.debug("[\(preTaskTime)] 🔄 Creating Task to fetch fresh metadata...")
+                                            // Present now playing view immediately BEFORE doing background work
+                                            showingNowPlaying = true
+
+                                            // Now do all the background work AFTER sheet is presented
                                             Task {
-                                                let taskStartTime = timestamp()
-                                                logger.info("[\(taskStartTime)] 🚀 Task started for fresh metadata fetch")
+                                                // Small delay to ensure sheet has appeared
+                                                try? await Task.sleep(nanoseconds: 50_000_000) // 0.05 seconds
+
+                                                // Fetch fresh metadata from API in background (non-blocking)
+                                                let preTaskTime = timestamp()
+                                                logger.debug("[\(preTaskTime)] 🔄 Fetching fresh metadata after sheet appeared...")
                                                 await musicService.fetchFreshTrackMetadata(metadata)
                                                 let taskEndTime = timestamp()
                                                 logger.info("[\(taskEndTime)] ✅ Fresh metadata fetch completed")
-                                            }
 
-                                            // Cancel any existing play task
-                                            currentPlayTask?.cancel()
+                                                // Cancel any existing play task
+                                                currentPlayTask?.cancel()
 
-                                            // Create new play task - DETACHED to run off main thread
-                                            let preDetachedTime = timestamp()
-                                            logger.debug("[\(preDetachedTime)] 🚀 Creating detached task for playSong")
-                                            currentPlayTask = Task.detached(priority: .userInitiated) {
-                                                await playSong(song)
+                                                // Create new play task - DETACHED to run off main thread
+                                                let preDetachedTime = timestamp()
+                                                logger.debug("[\(preDetachedTime)] 🚀 Creating detached task for playSong")
+                                                currentPlayTask = Task.detached(priority: .userInitiated) {
+                                                    await playSong(song)
+                                                }
+                                                let postDetachedTime = timestamp()
+                                                logger.info("[\(postDetachedTime)] ✅ Detached task created")
                                             }
-                                            let postDetachedTime = timestamp()
-                                            logger.info("[\(postDetachedTime)] ✅ Detached task created")
                                         } label: {
                                             RecentlyMarkedRow(song: song)
                                                 .contentShape(Rectangle())
                                         }
                                         .buttonStyle(SongRowButtonStyle())
                                         .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 4, trailing: 12))
+                                        .listRowBackground(Color.clear)
                                     }
                                 }
                             }
